@@ -1,0 +1,283 @@
+package healthautoexport
+
+// API document: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format
+
+import (
+	"time"
+
+	jsoniter "github.com/json-iterator/go"
+	"github.com/mitchellh/mapstructure"
+)
+
+const (
+	// TimeFormat is the format to parse time.Time in this package.
+	TimeFormat = "2006-01-02 15:04:05 -0700"
+)
+
+type Payload struct {
+	Data *PayloadData `json:"data,omitempty"`
+}
+
+type PayloadData struct {
+	Metrics  []*Metric  `json:"metrics,omitempty"`
+	Workouts []*Workout `json:"workouts,omitempty"`
+}
+
+// Metric defines a single measurement with units, as well as time-series data points.
+type Metric struct {
+	Name  string       `json:"name"`
+	Units Units        `json:"units"`
+	Data  []*Datapoint `json:"data"`
+}
+
+func (m Metric) GetUnits() Units {
+	return m.Units
+}
+
+// Workout defines a single recorded Workout.
+type Workout struct {
+	Name  string `json:"name"`
+	Start *Time  `json:"start"`
+	End   *Time  `json:"end"`
+
+	// Route data
+	Route []*RouteDatapoint `json:"route,omitempty"`
+
+	// Heart rate data.
+	HeartRateData     []*DatapointWithUnit `json:"heartRateData,omitempty"`
+	HeartRateRecovery []*DatapointWithUnit `json:"heartRateRecovery,omitempty"`
+
+	// Elevation data.
+	Elevation *Elevation `json:"elevation,omitempty"`
+
+	// Other workout fields.
+	Fields WorkoutFields `json:"-"`
+}
+
+// WorkoutFields is a map of generic QtyWithUnit fields in a Workout.
+type WorkoutFields map[string]*QtyWithUnit
+
+// workoutCopy avoids reflection stack overflow by creating type alias of Workout.
+// https://stackoverflow.com/a/43178272/2037090
+type workoutCopy Workout
+
+func (w *Workout) MarshalJSON() ([]byte, error) {
+	// Marshal and unmarshal Fields into a generic map
+	result := make(map[string]interface{})
+	bytes, err := jsoniter.Marshal(w.Fields)
+	if err != nil {
+		return nil, err
+	}
+	if err := jsoniter.Unmarshal(bytes, &result); err != nil {
+		return nil, err
+	}
+
+	// Marshal and unmarshal remaining fields onto the same map
+	outerBytes, err := jsoniter.Marshal((*workoutCopy)(w))
+	if err != nil {
+		return nil, err
+	}
+	if err := jsoniter.Unmarshal(outerBytes, &result); err != nil {
+		return nil, err
+	}
+
+	// Marshal result back
+	return jsoniter.Marshal(result)
+}
+
+// UnmarshalJSON implements a custom json.Unmarshaler for Workout.
+// This is necessary to unmarshal arbitrary Fields that may match QtyWithUnit.
+func (w *Workout) UnmarshalJSON(bytes []byte) error {
+	// First pass: Unmarshal into struct.
+	if err := jsoniter.Unmarshal(bytes, (*workoutCopy)(w)); err != nil {
+		return err
+	}
+
+	// Second pass: Unmarshal into generic map.
+	fields := make(map[string]interface{})
+	if err := jsoniter.Unmarshal(bytes, &fields); err != nil {
+		return err
+	}
+
+	// Use mapstructure to decode any matching field into Fields.
+	w.Fields = make(WorkoutFields)
+	for k, value := range fields {
+		var result QtyWithUnit
+		dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			TagName:     "json",
+			Result:      &result,
+			ErrorUnused: true, // required to prevent partial match
+		})
+		if err != nil {
+			return err
+		}
+		if err := dec.Decode(value); err == nil {
+			w.Fields[k] = &result
+		}
+	}
+
+	return nil
+}
+
+// Qty is used to define an arbitrary quantity.
+type Qty float64
+
+// Units is used to define a unit of measurement.
+type Units string
+
+// QtyWithUnit combines a Qty with Units of measurement.
+type QtyWithUnit struct {
+	Qty   Qty   `json:"qty"`
+	Units Units `json:"units"`
+}
+
+func (q QtyWithUnit) GetUnits() Units {
+	return q.Units
+}
+
+// Datapoint is a point-in-time value of a metric.
+type Datapoint struct {
+	Date *Time `json:"date"`
+
+	// Qty may not be specified for some types of metrics.
+	Qty Qty `json:"qty,omitempty"`
+
+	// Other fields.
+	Fields DatapointFields `json:"-"`
+}
+
+// DatapointFields is a map of fields with an arbitrary type in a single Datapoint.
+type DatapointFields map[string]interface{}
+
+// datapointCopy avoids reflection stack overflow by creating type alias of Datapoint.
+// https://stackoverflow.com/a/43178272/2037090
+type datapointCopy Datapoint
+
+func (w *Datapoint) MarshalJSON() ([]byte, error) {
+	// Marshal and unmarshal Fields into a generic map
+	result := make(map[string]interface{})
+	bytes, err := jsoniter.Marshal(w.Fields)
+	if err != nil {
+		return nil, err
+	}
+	if err := jsoniter.Unmarshal(bytes, &result); err != nil {
+		return nil, err
+	}
+
+	// Marshal and unmarshal remaining fields onto the same map
+	outerBytes, err := jsoniter.Marshal((*datapointCopy)(w))
+	if err != nil {
+		return nil, err
+	}
+	if err := jsoniter.Unmarshal(outerBytes, &result); err != nil {
+		return nil, err
+	}
+
+	// Marshal result back
+	return jsoniter.Marshal(result)
+}
+
+// UnmarshalJSON implements a custom json.Unmarshaler for Datapoint.
+// This is necessary to unmarshal arbitrary DatapointFields.
+func (w *Datapoint) UnmarshalJSON(bytes []byte) error {
+	// First pass: Unmarshal into struct.
+	if err := jsoniter.Unmarshal(bytes, (*datapointCopy)(w)); err != nil {
+		return err
+	}
+
+	// Second pass: Unmarshal into generic map, dropping qty and date.
+	fields := make(map[string]interface{})
+	if err := jsoniter.Unmarshal(bytes, &fields); err != nil {
+		return err
+	}
+	delete(fields, "qty")
+	delete(fields, "date")
+
+	// Try to unmarshal special types, otherwise fallback to normal json.Unmarshaler.
+	w.Fields = make(DatapointFields)
+	for k, v := range fields {
+		result := v
+		switch value := v.(type) {
+		case string:
+			var t Time
+			if err := jsoniter.Unmarshal([]byte(`"`+value+`"`), &t); err == nil {
+				result = &t
+				break
+			}
+		}
+		w.Fields[k] = result
+	}
+
+	return nil
+}
+
+// DatapointWithUnit is a point-in-time value of a QtyWithUnit.
+type DatapointWithUnit struct {
+	Date *Time `json:"date"`
+	QtyWithUnit
+}
+
+// RouteDatapoint is a point-in-time location in 3D coordinates.
+type RouteDatapoint struct {
+	Lat       float64 `json:"lat"`
+	Lon       float64 `json:"lon"`
+	Altitude  float64 `json:"altitude"`
+	Timestamp *Time   `json:"timestamp"`
+}
+
+// Elevation is a specify QtyWithUnit that specifies Ascent and Descent values.
+// It is only used for the Elevation field.
+type Elevation struct {
+	Units   Units `json:"units"`
+	Ascent  Qty   `json:"ascent"`
+	Descent Qty   `json:"descent"`
+}
+
+func (e Elevation) GetUnits() Units {
+	return e.Units
+}
+
+// Time is a custom time type for this package.
+type Time struct {
+	time.Time
+}
+
+func NewTime(t time.Time) *Time {
+	return &Time{Time: t}
+}
+
+func (t *Time) IsZero() bool {
+	if t == nil {
+		return true
+	}
+	return t.Time.IsZero()
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+// This implementation overrides the default time.Time json.Marshaler
+// implementation, and marshals using TimeFormat.
+func (t Time) MarshalJSON() ([]byte, error) {
+	// Propagate marshal errors forward first.
+	if ret, err := t.Time.MarshalJSON(); err != nil {
+		return ret, err
+	}
+
+	// Otherwise, marshal using TimeFormat.
+	b := make([]byte, 0, len(TimeFormat)+2)
+	b = append(b, '"')
+	b = t.AppendFormat(b, TimeFormat)
+	b = append(b, '"')
+	return b, nil
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+// This implementation overrides the default time.Time json.Unmarshaler
+// implementation, and parses timestamps using TimeFormat.
+func (t *Time) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return t.Time.UnmarshalJSON(data)
+	}
+	var err error
+	t.Time, err = time.Parse(`"`+TimeFormat+`"`, string(data))
+	return err
+}
