@@ -246,6 +246,11 @@ func NewTime(t time.Time) *Time {
 	return &Time{Time: t}
 }
 
+// String returns a RFC3339 formatted timestamp string.
+func (t *Time) String() string {
+	return t.Format(time.RFC3339)
+}
+
 func (t *Time) IsZero() bool {
 	if t == nil {
 		return true
