@@ -42,6 +42,6 @@ jobs:
       - name: Push code coverage to Codecov
         uses: codecov/codecov-action@v2
         # Push code coverage only for one of the environments
-        if: matrix.os == "ubuntu-latest"
+        if: matrix.os == 'ubuntu-latest'
         with:
           files: ./coverage1.xml
