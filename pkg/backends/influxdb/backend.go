@@ -16,10 +16,7 @@ import (
 )
 
 // Backend InfluxDB is used to store ingested metrics into InfluxDB. All metrics
-// will be stored as single Points (i.e. time-series data). Workouts will be
-// stored also as time-series data after additional post-processing. Due to the
-// complex nature of Workout data, not all information can be properly encoded
-// as time-series data.
+// will be stored as single Points (i.e. time-series data).
 type Backend struct {
 	ctx            context.Context
 	client         influxdb2.Client
@@ -169,6 +166,7 @@ func (b *Backend) writeWorkouts(workouts []*healthautoexport.Workout, targetName
 		}
 
 		// Create during-workout datapoints
+		points = append(points, b.createRoutePoints("route", tags, workout.Route)...)
 		points = append(points, b.createWorkoutPoints("heart_rate_data", tags, workout.HeartRateData)...)
 		points = append(points, b.createWorkoutPoints("heart_rate_recovery", tags, workout.HeartRateRecovery)...)
 
@@ -244,6 +242,23 @@ func (b *Backend) createWorkoutPoints(
 			"qty": float64(datum.Qty),
 		}
 		point := write.NewPoint(measurement, tags, fields, datum.Date.Time)
+		points = append(points, point)
+	}
+	return points
+}
+
+func (b *Backend) createRoutePoints(
+	name string, tags map[string]string, data []*healthautoexport.RouteDatapoint,
+) []*write.Point {
+	points := make([]*write.Point, 0, len(data))
+	for _, datum := range data {
+		measurement := name
+		fields := map[string]interface{}{
+			"lat":      datum.Lat,
+			"lon":      datum.Lon,
+			"altitude": datum.Altitude,
+		}
+		point := write.NewPoint(measurement, tags, fields, datum.Timestamp.Time)
 		points = append(points, point)
 	}
 	return points
