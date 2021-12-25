@@ -18,9 +18,9 @@ import (
 // Backend InfluxDB is used to store ingested metrics into InfluxDB. All metrics
 // will be stored as single Points (i.e. time-series data).
 type Backend struct {
-	ctx            context.Context
-	client         influxdb2.Client
-	additionalTags map[string]string
+	ctx        context.Context
+	client     influxdb2.Client
+	staticTags map[string]string
 }
 
 var _ backends.Backend = &Backend{}
@@ -32,9 +32,9 @@ func NewBackend() (backends.Backend, error) {
 	}
 
 	backend := &Backend{
-		ctx:            context.TODO(),
-		client:         client,
-		additionalTags: make(map[string]string),
+		ctx:        context.TODO(),
+		client:     client,
+		staticTags: make(map[string]string),
 	}
 
 	// Prepare static tags.
@@ -43,7 +43,7 @@ func NewBackend() (backends.Backend, error) {
 		if len(tokens) != 2 {
 			return nil, fmt.Errorf("invalid static tag %v", tag)
 		}
-		backend.additionalTags[tokens[0]] = tokens[1]
+		backend.staticTags[tokens[0]] = tokens[1]
 	}
 
 	return backend, nil
@@ -109,7 +109,9 @@ func (b *Backend) getMetricPoints(
 	measurement string, metric *healthautoexport.Metric, targetName string,
 ) []*write.Point {
 	points := make([]*write.Point, 0, len(metric.Data))
-	tags := b.MakeTags(targetName)
+	tags := b.MakeTags(map[string]string{
+		"target_name": targetName,
+	})
 
 	for _, datum := range metric.Data {
 		fields := make(map[string]interface{})
@@ -153,8 +155,10 @@ func (b *Backend) writeWorkouts(workouts []*healthautoexport.Workout, targetName
 		points := make([]*write.Point, 0)
 
 		// Create tags
-		tags := b.MakeTags(targetName)
-		tags["workout_name"] = workout.Name
+		tags := b.MakeTags(map[string]string{
+			"target_name":  targetName,
+			"workout_name": workout.Name,
+		})
 
 		// Create aggregate workout point
 		point, err := b.createWorkoutAggregatePoint(workout, tags)
@@ -266,13 +270,17 @@ func (b *Backend) createRoutePoints(
 
 // MakeTags returns a map of tags that can be safely modified.
 // Accepts a targetName, which if not empty, will be added to the map.
-func (b *Backend) MakeTags(targetName string) map[string]string {
-	tags := make(map[string]string, len(b.additionalTags))
-	for k, v := range b.additionalTags {
-		tags[k] = v
+func (b *Backend) MakeTags(additional map[string]string) map[string]string {
+	tags := make(map[string]string, len(b.staticTags))
+	for k, v := range b.staticTags {
+		if v != "" {
+			tags[k] = v
+		}
 	}
-	if targetName != "" {
-		tags["target_name"] = targetName
+	for k, v := range additional {
+		if v != "" {
+			tags[k] = v
+		}
 	}
 	return tags
 }
