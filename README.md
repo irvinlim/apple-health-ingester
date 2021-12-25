@@ -1,5 +1,9 @@
 # Apple Health Ingester
 
+![license](https://img.shields.io/github/license/irvinlim/apple-health-ingester)
+[![docker pulls](https://img.shields.io/docker/pulls/irvinlim/apple-health-ingester.svg)](https://hub.docker.com/r/irvinlim/apple-health-ingester)
+[![image size](https://img.shields.io/docker/image-size/irvinlim/apple-health-ingester?sort=date)](https://hub.docker.com/r/irvinlim/apple-health-ingester/tags)
+
 Simple HTTP server written in Go that ingests data from [Health Auto Export](https://www.healthexportapp.com/) into multiple configurable storage backends.
 
 ## Why?
@@ -52,7 +56,9 @@ Usage of ./build/ingester:
 
 ### Docker
 
-Docker Hub image coming soon!
+```sh
+$ docker pull irvinlim/apple-health-ingester
+```
 
 ## Global Configuration
 
@@ -156,9 +162,12 @@ There are two kinds of data:
 2. **During-workout time-series data**: Contains per-minute granularity time-series data
    - Measurement: Currently, only the following measurements are supported for this type of data: 
      - `heart_rate_data_bpm`
+       - Fields: `qty`
      - `heart_rate_recovery_bpm`
-   - Field: `qty`
-   - Timestamp: Corresponds to the `date` field
+       - Fields: `qty`
+     - `route`
+       - Fields: `lat`, `lon`, `altitude`
+   - Timestamp: Corresponds to the `date`/`timestamp` field
 
 All workout data have the following tags:
 
