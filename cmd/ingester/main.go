@@ -59,7 +59,7 @@ func main() {
 	go func() {
 		log.WithField("listen_addr", listenAddr).Info("starting http server")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Panicf("cannot start http server")
+			log.WithError(err).Panicf("cannot start http server")
 		}
 	}()
 
