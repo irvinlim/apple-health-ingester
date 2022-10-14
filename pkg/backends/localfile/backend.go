@@ -1,7 +1,6 @@
 package localfile
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"sort"
@@ -114,7 +113,7 @@ func (b *Backend) handleMetric(metric *healthautoexport.Metric, target string) e
 
 func (b *Backend) loadMetrics() (map[string]*MetricFile, error) {
 	output := make(map[string]*MetricFile)
-	files, err := ioutil.ReadDir(metricsPath)
+	files, err := os.ReadDir(metricsPath)
 	if err != nil {
 		// Directory doesn't exist, simply return empty map.
 		if os.IsNotExist(err) {
