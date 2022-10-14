@@ -37,7 +37,7 @@ jobs:
         run: go test -v ./...
 
       - name: Build
-        run: env GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -v -o ${{env.executable}} .
+        run: env GOOS=${{matrix.GOOS}} GOARCH=${{matrix.GOARCH}} go build -v -o ${{env.executable}} ./cmd/ingester/...
 
       - name: Create or update release
         id: create_release
