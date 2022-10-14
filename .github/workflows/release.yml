@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Version to release (vX.X.X)
+        required: true
+        type: string
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        GOOS: [linux, darwin]
+        GOARCH: [arm, arm64, amd64]
+        exclude:
+          - GOOS: darwin
+            GOARCH: arm
+
+    runs-on: ubuntu-latest
+    env:
+      executable:  apple-health-ingester-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ^1.19
+
+      - name: Get dependencies
+        run: go get -v -t -d ./...
+
+      - name: Test
+        run: go test -v ./...
+
+      - name: Build
+        run: env GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -v -o ${{env.executable}} .
+
+      - name: Create or update release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          artifacts: ${{env.executable}}
+          tag: ${{input.release_version}}
+          commit: main
+          token: ${{ secrets.GITHUB_TOKEN }}
