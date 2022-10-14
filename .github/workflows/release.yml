@@ -45,6 +45,6 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ${{env.executable}}
-          tag: ${{input.release_version}}
+          tag: ${{inputs.release_version}}
           commit: main
           token: ${{ secrets.GITHUB_TOKEN }}
