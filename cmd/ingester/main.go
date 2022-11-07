@@ -58,7 +58,13 @@ func main() {
 	// Start http server
 	go func() {
 		log.WithField("listen_addr", listenAddr).Info("starting http server")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		var err error
+		if enableTLS {
+			err = server.ListenAndServeTLS(certFile, keyFile)
+		} else {
+			err = server.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			log.WithError(err).Panicf("cannot start http server")
 		}
 	}()
