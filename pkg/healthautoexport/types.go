@@ -3,6 +3,8 @@ package healthautoexport
 // API document: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format
 
 import (
+	"reflect"
+	"strings"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -144,6 +146,12 @@ type Datapoint struct {
 
 	// Other fields.
 	Fields DatapointFields `json:"-"`
+
+	// Only defined for sleep_analysis if "Aggregate Sleep Data" is disabled
+	StartDate *Time `json:"startDate"`
+
+	// Only defined for sleep_analysis if "Aggregate Sleep Data" is disabled
+	EndDate *Time `json:"endDate"`
 }
 
 // DatapointFields is a map of fields with an arbitrary type in a single Datapoint.
@@ -190,8 +198,13 @@ func (w *Datapoint) UnmarshalJSON(bytes []byte) error {
 	if err := jsoniter.Unmarshal(bytes, &fields); err != nil {
 		return err
 	}
-	delete(fields, "qty")
-	delete(fields, "date")
+
+	t := reflect.TypeOf(w)
+	// remove already parsed fields in Datapoint struct, leaving only unknown fields
+	for i := 0; i < t.NumField(); i++ {
+		jsonTag := t.Field(i).Tag.Get("json")
+		delete(fields, strings.Split(jsonTag, ",")[0])
+	}
 
 	// Try to unmarshal special types, otherwise fallback to normal json.Unmarshaler.
 	w.Fields = make(DatapointFields)
