@@ -133,12 +133,14 @@ func (b *Backend) getMetricPoints(
 
 		// Add sleep_analysis non-aggregated start date if set
 		if datum.StartDate != nil {
+			fields["state"] = 1
 			startPoint := write.NewPoint(measurement, tags, fields, datum.StartDate.Time)
 			points = append(points, startPoint)
 		}
 
 		// Add sleep_analysis non-aggregated end date if set
 		if datum.EndDate != nil {
+			fields["state"] = 0
 			endPoint := write.NewPoint(measurement, tags, fields, datum.EndDate.Time)
 			points = append(points, endPoint)
 		}
