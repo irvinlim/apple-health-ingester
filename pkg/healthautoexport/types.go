@@ -199,7 +199,7 @@ func (w *Datapoint) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	t := reflect.TypeOf(w)
+	t := reflect.TypeOf(*w)
 	// remove already parsed fields in Datapoint struct, leaving only unknown fields
 	for i := 0; i < t.NumField(); i++ {
 		jsonTag := t.Field(i).Tag.Get("json")
