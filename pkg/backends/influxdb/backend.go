@@ -131,25 +131,32 @@ func (b *Backend) getMetricPoints(
 			continue
 		}
 
-		// Add sleep_analysis non-aggregated start date if set
-		if datum.StartDate != nil {
-			fields["state"] = 1
-			startPoint := write.NewPoint(measurement, tags, fields, datum.StartDate.Time)
-			points = append(points, startPoint)
+		point := write.NewPoint(measurement, tags, fields, datum.Date.Time)
+		points = append(points, point)
+	}
+
+	for _, sleepAnalysis := range metric.SleepAnalyses {
+		startFields := make(map[string]interface{})
+		endFields := make(map[string]interface{})
+
+		// Add qty if set
+		if sleepAnalysis.Qty != 0 {
+			endFields["qty"] = float64(sleepAnalysis.Qty)
 		}
 
-		// Add sleep_analysis non-aggregated end date if set
-		if datum.EndDate != nil {
-			fields["state"] = 0
-			endPoint := write.NewPoint(measurement, tags, fields, datum.EndDate.Time)
-			points = append(points, endPoint)
-		}
+		// tags
+		tags["source"] = sleepAnalysis.Source
+		tags["value"] = sleepAnalysis.Value
 
-		// Date will be set for all but aggregated sleep_analysis data
-		if datum.Date != nil {
-			point := write.NewPoint(measurement, tags, fields, datum.Date.Time)
-			points = append(points, point)
-		}
+		// start point has state = 1 (on)
+		startFields["state"] = 1
+		startPoint := write.NewPoint(measurement, tags, startFields, sleepAnalysis.StartDate.Time)
+		points = append(points, startPoint)
+
+		// end point has state = 0 (off)
+		endFields["state"] = 0
+		endPoint := write.NewPoint(measurement, tags, endFields, sleepAnalysis.EndDate.Time)
+		points = append(points, endPoint)
 	}
 
 	return points

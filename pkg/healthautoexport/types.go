@@ -3,6 +3,7 @@ package healthautoexport
 // API document: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"time"
@@ -27,12 +28,26 @@ type PayloadData struct {
 
 // Metric defines a single measurement with units, as well as time-series data points.
 type Metric struct {
-	Name  string       `json:"name"`
-	Units Units        `json:"units"`
-	Data  []*Datapoint `json:"data"`
+	Name          string           `json:"name"`
+	Units         Units            `json:"units"`
+	Data          []*Datapoint     `json:"data"`
+	SleepAnalyses []*SleepAnalysis `json:"-"`
 }
 
-func (m Metric) GetUnits() Units {
+type SleepAnalysis struct {
+	// Start/EndDate only defined for sleep_analysis if "Aggregate Sleep Data" is disabled
+	StartDate *Time  `json:"startDate"`
+	EndDate   *Time  `json:"endDate"`
+	Qty       Qty    `json:"qty,omitempty"`
+	Source    string `json:"source"`
+	Value     string `json:"value"`
+}
+
+// metricCopy avoids reflection stack overflow by creating type alias of Metric.
+// https://stackoverflow.com/a/43178272/2037090
+type metricCopy Metric
+
+func (m *Metric) GetUnits() Units {
 	return m.Units
 }
 
@@ -62,6 +77,66 @@ type WorkoutFields map[string]*QtyWithUnit
 // workoutCopy avoids reflection stack overflow by creating type alias of Workout.
 // https://stackoverflow.com/a/43178272/2037090
 type workoutCopy Workout
+
+func (m *Metric) UnmarshalJSON(bytes []byte) error {
+	type MetricInternal struct {
+		Name  string          `json:"name"`
+		Units Units           `json:"units"`
+		Data  json.RawMessage `json:"data"`
+	}
+	mi := MetricInternal{}
+	if err := jsoniter.Unmarshal(bytes, &mi); err != nil {
+		return err
+	}
+	m.Name = mi.Name
+	m.Units = mi.Units
+	if mi.Name == "sleep_analysis" {
+		var sa []*SleepAnalysis
+		if err := jsoniter.Unmarshal(mi.Data, &sa); err != nil {
+			return err
+		}
+		if sa[0].Value != "" {
+			m.SleepAnalyses = sa
+			return nil
+		}
+	}
+	if mi.Data == nil {
+		return nil
+	}
+	// if name not sleep_analysis, or is an aggregated sleep analysis, do normal Datapoint
+	var d []*Datapoint
+	if err := jsoniter.Unmarshal(mi.Data, &d); err != nil {
+		return err
+	}
+	m.Data = d
+
+	return nil
+}
+
+func (m *Metric) MarshalJSON() ([]byte, error) {
+	if len(m.SleepAnalyses) == 0 {
+		return jsoniter.Marshal((*metricCopy)(m))
+	}
+	sleepDatapoints := make([]*Datapoint, len(m.SleepAnalyses))
+	for i, s := range m.SleepAnalyses {
+		sleepDatapoints[i] = &Datapoint{
+			Qty: s.Qty,
+			Fields: map[string]interface{}{
+				"startDate": s.StartDate,
+				"endDate":   s.EndDate,
+				"value":     s.Value,
+				"source":    s.Source,
+			},
+		}
+	}
+	mCopy := Metric{
+		Name:  m.Name,
+		Units: m.Units,
+		Data:  sleepDatapoints,
+	}
+	return jsoniter.Marshal((metricCopy)(mCopy))
+
+}
 
 func (w *Workout) MarshalJSON() ([]byte, error) {
 	// Marshal and unmarshal Fields into a generic map
@@ -146,12 +221,6 @@ type Datapoint struct {
 
 	// Other fields.
 	Fields DatapointFields `json:"-"`
-
-	// Only defined for sleep_analysis if "Aggregate Sleep Data" is disabled
-	StartDate *Time `json:"startDate"`
-
-	// Only defined for sleep_analysis if "Aggregate Sleep Data" is disabled
-	EndDate *Time `json:"endDate"`
 }
 
 // DatapointFields is a map of fields with an arbitrary type in a single Datapoint.
