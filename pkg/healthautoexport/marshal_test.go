@@ -67,6 +67,26 @@ var (
 		},
 	}
 
+	payloadMetricsSleepAnalysisNonAggregated = &healthautoexport.Payload{
+		Data: &healthautoexport.PayloadData{
+			Metrics: []*healthautoexport.Metric{
+				{
+					Name:  "sleep_analysis",
+					Units: "hr",
+					SleepAnalyses: []*healthautoexport.SleepAnalysis{
+						{
+							StartDate: mktime("2021-12-18 02:21:06 +0800"),
+							EndDate:   mktime("2021-12-18 08:57:06 +0800"),
+							Qty:       6.108333333333333,
+							Source:    "Irvin's Apple Watch",
+							Value:     "Core",
+						},
+					},
+				},
+			},
+		},
+	}
+
 	payloadWithWorkouts = &healthautoexport.Payload{
 		Data: &healthautoexport.PayloadData{
 			Workouts: []*healthautoexport.Workout{
@@ -154,6 +174,30 @@ func TestMarshalToString(t *testing.T) {
       }
     ]
   }
+}`,
+		},
+		{
+			name:    "marshal non-aggregated sleep analysis",
+			payload: payloadMetricsSleepAnalysisNonAggregated,
+			want: `{
+	"data": {
+		"metrics": [
+			{
+				"name": "sleep_analysis",
+				"units": "hr",
+				"data": [
+					{
+						"source": "Irvin's Apple Watch",
+						"startDate": "2021-12-18 02:21:06 +0800",
+						"endDate": "2021-12-18 08:57:06 +0800",
+						"value": "Core",
+						"date": null,
+						"qty": 6.108333333333333
+					}
+				]
+			}
+		]
+	}
 }`,
 		},
 	}
@@ -306,6 +350,30 @@ func TestUnmarshalFromString(t *testing.T) {
       }
     ]
   }
+}`,
+		},
+		{
+			name: "unmarshal non-aggregated sleep analysis",
+			want: payloadMetricsSleepAnalysisNonAggregated,
+			input: `{
+	"data": {
+		"metrics": [
+			{
+				"name": "sleep_analysis",
+				"units": "hr",
+				"data": [
+					{
+						"source": "Irvin's Apple Watch",
+						"startDate": "2021-12-18 02:21:06 +0800",
+						"endDate": "2021-12-18 08:57:06 +0800",
+						"value": "Core",
+						"date": null,
+						"qty": 6.108333333333333
+					}
+				]
+			}
+		]
+	}
 }`,
 		},
 	}
