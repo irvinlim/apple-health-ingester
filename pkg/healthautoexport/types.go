@@ -95,7 +95,7 @@ func (m *Metric) UnmarshalJSON(bytes []byte) error {
 		if err := jsoniter.Unmarshal(mi.Data, &sa); err != nil {
 			return err
 		}
-		if sa[0].Value != "" {
+		if len(sa) > 0 && sa[0].Value != "" {
 			m.SleepAnalyses = sa
 			return nil
 		}
