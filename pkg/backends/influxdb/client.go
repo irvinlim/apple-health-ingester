@@ -6,6 +6,8 @@ import (
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
+
+	apierrors "github.com/irvinlim/apple-health-ingester/pkg/errors"
 )
 
 // Client knows how to write to an InfluxDB database.
@@ -40,11 +42,17 @@ func NewClient() (Client, error) {
 }
 
 func (c *clientImpl) WriteMetrics(ctx context.Context, point ...*write.Point) error {
-	return c.client.WriteAPIBlocking(c.orgName, c.metricsBucketName).WritePoint(ctx, point...)
+	if err := c.client.WriteAPIBlocking(c.orgName, c.metricsBucketName).WritePoint(ctx, point...); err != nil {
+		return apierrors.WrapRetryableWrite(err)
+	}
+	return nil
 }
 
 func (c *clientImpl) WriteWorkouts(ctx context.Context, point ...*write.Point) error {
-	return c.client.WriteAPIBlocking(c.orgName, c.workoutsBucketName).WritePoint(ctx, point...)
+	if err := c.client.WriteAPIBlocking(c.orgName, c.workoutsBucketName).WritePoint(ctx, point...); err != nil {
+		return apierrors.WrapRetryableWrite(err)
+	}
+	return nil
 }
 
 // MockClient is a mock implementation of Client.
