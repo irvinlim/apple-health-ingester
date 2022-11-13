@@ -17,6 +17,13 @@ func main() {
 	pflag.Parse()
 	mux := http.NewServeMux()
 
+	// Set log level
+	if logLevel > 0 {
+		level := log.Level(logLevel)
+		log.WithField("log_level", level).Info("setting log level")
+		log.SetLevel(level)
+	}
+
 	// Add middlewares
 	middlewares := []Middleware{
 		createLoggingHandler(log.StandardLogger()),
