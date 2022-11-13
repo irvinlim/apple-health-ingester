@@ -58,7 +58,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ steps.tag_name.outputs.TAG_NAME }}
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ needs.metadata.outputs.tag_name }}
 
   release-artifacts:
     strategy:
@@ -96,6 +96,6 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ${{env.executable}}
-          tag: ${{ steps.tag_name.outputs.TAG_NAME }}
+          tag: ${{ needs.metadata.outputs.tag_name }}
           commit: main
           token: ${{ secrets.GITHUB_TOKEN }}
