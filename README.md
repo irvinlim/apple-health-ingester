@@ -1,7 +1,7 @@
 # Apple Health Ingester
 
 ![license](https://img.shields.io/github/license/irvinlim/apple-health-ingester)
-[![coverage](https://img.shields.io/codecov/c/gh/irvinlim/apple-health-ingester)](https://hub.docker.com/r/irvinlim/apple-health-ingester/tags)
+[![coverage](https://img.shields.io/codecov/c/gh/irvinlim/apple-health-ingester)](https://app.codecov.io/gh/irvinlim/apple-health-ingester)
 [![docker pulls](https://img.shields.io/docker/pulls/irvinlim/apple-health-ingester.svg)](https://hub.docker.com/r/irvinlim/apple-health-ingester)
 [![image size](https://img.shields.io/docker/image-size/irvinlim/apple-health-ingester?sort=date)](https://hub.docker.com/r/irvinlim/apple-health-ingester/tags)
 
