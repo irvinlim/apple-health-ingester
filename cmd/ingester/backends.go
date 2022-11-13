@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 
+	"github.com/pkg/errors"
+
 	"github.com/irvinlim/apple-health-ingester/pkg/backends/influxdb"
 	"github.com/irvinlim/apple-health-ingester/pkg/backends/localfile"
 	"github.com/irvinlim/apple-health-ingester/pkg/ingester"
@@ -29,7 +31,11 @@ func RegisterInfluxDBBackend(ingester *ingester.Ingester, mux *http.ServeMux) er
 	if !enableInfluxDB {
 		return nil
 	}
-	backend, err := influxdb.NewBackend()
+	client, err := influxdb.NewClient()
+	if err != nil {
+		return errors.Wrapf(err, "cannot initialize client")
+	}
+	backend, err := influxdb.NewBackend(client)
 	if err != nil {
 		return err
 	}
