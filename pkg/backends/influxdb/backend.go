@@ -48,6 +48,15 @@ func (b *Backend) Name() string {
 }
 
 func (b *Backend) Write(payload *healthautoexport.Payload, targetName string) error {
+	// Properly handle nil data.
+	if payload.Data == nil {
+		log.WithFields(log.Fields{
+			"backend": b.Name(),
+			"target":  targetName,
+		}).Warn("empty payload data received, skipping")
+		return nil
+	}
+
 	// Write metrics.
 	if err := b.writeMetrics(payload.Data.Metrics, targetName); err != nil {
 		return errors.Wrapf(err, "write metrics error")

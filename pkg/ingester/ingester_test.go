@@ -81,3 +81,25 @@ tickerLoop:
 	ingest.Shutdown()
 	assert.Equal(t, expectedWrites, len(backend.Writes))
 }
+
+func TestIngester_BackendPanic(t *testing.T) {
+	ingest := ingester.NewIngester()
+	backend := noop.NewBackend()
+	assert.NoError(t, ingest.AddBackend(backend))
+	ingest.Start()
+
+	var expectedWrites int
+
+	// Backend should panic and throw an error, but will recover
+	backend.ShouldPanic = true
+	assert.NoError(t, ingest.IngestFromString(payload, backend.Name(), ""))
+	time.Sleep(processingDelay)
+	assert.Equal(t, expectedWrites, len(backend.Writes))
+
+	// Backend will no longer panic and writes should still succeed
+	backend.ShouldPanic = false
+	assert.NoError(t, ingest.IngestFromString(payload, backend.Name(), ""))
+	time.Sleep(processingDelay)
+	expectedWrites++
+	assert.Equal(t, expectedWrites, len(backend.Writes))
+}
