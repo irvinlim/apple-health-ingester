@@ -9,20 +9,27 @@ Simple HTTP server written in Go that ingests data from [Health Auto Export](htt
 
 ## Why?
 
-The *Health Auto Export* app (https://www.healthexportapp.com) allows you to easily export Apple Health data from your iOS device into a portable format. However, it currently only supports the following export methods:
+The *Health Auto Export* app (https://www.healthexportapp.com) allows you to easily export Apple Health data from your iOS device into a portable format, and currently supports exporting to various sinks such as [Google Drive](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports#googledrive), [Dropbox](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports#dropbox) and [Home Assistant](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports#homeassistant).
 
-- iCloud Drive
-- [REST API](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports#restapi)
-- [Home Assistant](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports#homeassistant)
-- [MQTT](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports#mqtt)
+As such, this simple HTTP server will receive requests from the *Health Auto Export* app via the [REST API export method](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports#restapi), which allows the flexibility to export data into one or more configured backends.
 
-As such, this simple HTTP server will receive requests from the *Health Auto Export* app via the *REST API* export method, which allows the flexibility to export data into one or more configured backends.
+## Features
+
+* Supports multiple backends for writing metrics.
+  * **Local File**: Writes the ingested payloads into the local filesystem as JSON.
+  * **InfluxDB**: Writes the ingested metrics and workout data to InfluxDB (or any other databases that support the protocol such as [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics#how-to-send-data-from-influxdb-compatible-agents-such-as-telegraf)).
+* Supports ingestion of data separately from multiple iOS devices.
+* Optional Bearer authentication to protect publicly exposed endpoints.
 
 ## Setup Instructions
 
-You will first have to download the [*Health Auto Export*](https://www.healthexportapp.com) iOS app on your iOS device. **NOTE**: You will need to purchase Premium, or use the free trial to enable Automations.
+### Health Auto Export Setup
 
-In the app, create a new Automation (detailed instructions [here](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports)):
+You will first have to download the [*Health Auto Export*](https://www.healthexportapp.com) iOS app on your iOS device. 
+
+> **NOTE**: You will need to purchase [a Premium subscription](https://www.healthyapps.dev/health-auto-export-pricing), or use the free trial in order to enable Automations.
+
+In the app, create a new Automation:
    
 1. Under *Automation Type*, select `REST API`.
 2. Enter the URL to your server (see below for instructions on how to run the server).
@@ -32,14 +39,35 @@ In the app, create a new Automation (detailed instructions [here](https://www.he
 4. You can optionally choose which Health Metrics and/or Workouts to send.
 5. Under *Manual Sync*, you can select a time range, and click "Export" to test if it is working.
 
-## Running the Server
+For more detailed instructions, refer to the [official site](https://www.healthyapps.dev/how-to-configure-automatic-apple-health-exports).
 
-### Running Locally
+### Running the Server
 
-You only need `go` to build the server.
+You can deploy and run the server using Docker or as a standalone binary, which is packaged and released on the .
+
+### Linux Download
+
+The following command downloads the server for `linux-amd64`. For more platforms, refer to the [Releases](https://github.com/irvinlim/apple-health-ingester/releases) page.
 
 ```sh
-$ go build -o build/ingester ./cmd/ingester/....
+$ curl -L https://github.com/irvinlim/apple-health-ingester/releases/latest/download/apple-health-ingester-linux-amd64 > apple-health-ingester
+$ chmod +x apple-health-ingester
+$ ./apple-health-ingester --help
+```
+
+### Docker Image
+
+The image is also hosted on [Docker Hub](https://hub.docker.com/r/irvinlim/apple-health-ingester).
+
+```sh
+$ docker run --rm irvinlim/apple-health-ingester --help
+```
+
+## Configuration
+
+### Command-line Flags
+
+```sh
 $ ./build/ingester --help
 Usage of ./build/ingester:
       --backend.influxdb                     Enable the InfluxDB storage backend.
@@ -57,20 +85,36 @@ Usage of ./build/ingester:
       --influxdb.staticTags strings          Additional tags to add to InfluxDB for every single request, in key=value format.
       --influxdb.workoutsBucketName string   InfluxDB bucket name for workouts.
       --localfile.metricsPath string         Output path to write metrics, with one metric per file. All data will be aggregated by timestamp. Any existing data will be merged together.
+      --log uint32                           Log level to use, defaults to 4 (INFO).
 ```
 
-### Docker
+### Global Configuration
 
-```sh
-$ docker pull irvinlim/apple-health-ingester
-```
+#### `http.listenAddr`
 
-## Global Configuration
+Address to listen on, in `IP:port` format. Defaults to `:8080`.
 
-- `http.listenAddr`: Address to listen on. (default ":8080")
-- `http.authToken`: Optional authorization token that will be used to authenticate incoming requests.
+#### `http.authToken`
+
+Optional authorization token that will be used to authenticate incoming requests. The header name should be `Authorization`, and the header value should be `Bearer <TOKEN>`.
+
+#### TLS Configuration
+
+To enable TLS, the following flags must be provided:
+
+* `http.enableTLS`: Starts a TLS/HTTPS server instead of HTTP.
+* `http.keyFile`: TLS private key file.
+* `http.certFile`: TLS certificate file.
+
+#### `log`
+
+Specify the log level. Larger values imply for greater log verbosity, and follow the log levels from [logrus](https://github.com/sirupsen/logrus/blob/f8bf7650dccb756cea26edaf9217aab85500fe07/logrus.go#L91-L112). Defaults to 4 (`INFO`).
 
 ## Supported Backends
+
+Each backend must be enabled explicitly. By default, no backends are enabled by default.
+
+Additionally, each backend currently has a fixed URL that must be used when configuring the automation in Health Auto Export.
 
 ### LocalFile
 
