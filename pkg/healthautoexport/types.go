@@ -14,7 +14,8 @@ import (
 
 const (
 	// TimeFormat is the format to parse time.Time in this package.
-	TimeFormat = "2006-01-02 15:04:05 -0700"
+	TimeFormat        = "2006-01-02 15:04:05 -0700"
+	SleepAnalysisName = "sleep_analysis"
 )
 
 type Payload struct {
@@ -30,8 +31,18 @@ type PayloadData struct {
 type Metric struct {
 	Name          string           `json:"name"`
 	Units         Units            `json:"units"`
-	Data          []*Datapoint     `json:"data"`
+	Datapoints    []*Datapoint     `json:"-"`
 	SleepAnalyses []*SleepAnalysis `json:"-"`
+}
+
+// metricCopy avoids reflection stack overflow by creating type alias of Metric.
+// https://stackoverflow.com/a/43178272/2037090
+type metricCopy Metric
+
+// jsonMetric is used to support JSON marshal/unmarshalling of Metric
+type jsonMetric struct {
+	*metricCopy
+	Data json.RawMessage `json:"data"`
 }
 
 // SleepAnalysis defines a period during sleep of various types (Value).
@@ -43,10 +54,6 @@ type SleepAnalysis struct {
 	Source    string `json:"source"`
 	Value     string `json:"value"`
 }
-
-// metricCopy avoids reflection stack overflow by creating type alias of Metric.
-// https://stackoverflow.com/a/43178272/2037090
-type metricCopy Metric
 
 func (m *Metric) GetUnits() Units {
 	return m.Units
@@ -80,63 +87,60 @@ type WorkoutFields map[string]*QtyWithUnit
 type workoutCopy Workout
 
 func (m *Metric) UnmarshalJSON(bytes []byte) error {
-	type MetricInternal struct {
-		Name  string          `json:"name"`
-		Units Units           `json:"units"`
-		Data  json.RawMessage `json:"data"`
+	intermediate := jsonMetric{
+		metricCopy: (*metricCopy)(m),
 	}
-	mi := MetricInternal{}
-	if err := jsoniter.Unmarshal(bytes, &mi); err != nil {
+	if err := jsoniter.Unmarshal(bytes, &intermediate); err != nil {
 		return err
 	}
-	m.Name = mi.Name
-	m.Units = mi.Units
-	if mi.Name == "sleep_analysis" {
+	switch m.Name {
+	case SleepAnalysisName:
 		var sa []*SleepAnalysis
-		if err := jsoniter.Unmarshal(mi.Data, &sa); err != nil {
+		if err := jsoniter.Unmarshal(intermediate.Data, &sa); err != nil {
 			return err
 		}
+		// only process as SleepAnalysis if Value field is set
 		if len(sa) > 0 && sa[0].Value != "" {
 			m.SleepAnalyses = sa
 			return nil
 		}
-	}
-	if mi.Data == nil {
+		// process aggregated sleep_analysis like other fields
+		fallthrough
+	default:
+		if intermediate.Data == nil {
+			return nil
+		}
+		var d []*Datapoint
+		if err := jsoniter.Unmarshal(intermediate.Data, &d); err != nil {
+			return err
+		}
+		m.Datapoints = d
 		return nil
 	}
-	// if name not sleep_analysis, or is an aggregated sleep analysis, do normal Datapoint
-	var d []*Datapoint
-	if err := jsoniter.Unmarshal(mi.Data, &d); err != nil {
-		return err
-	}
-	m.Data = d
-
-	return nil
 }
 
 func (m *Metric) MarshalJSON() ([]byte, error) {
-	if len(m.SleepAnalyses) == 0 {
-		return jsoniter.Marshal((*metricCopy)(m))
+	intermediate := jsonMetric{
+		metricCopy: (*metricCopy)(m),
 	}
-	sleepDatapoints := make([]*Datapoint, len(m.SleepAnalyses))
-	for i, s := range m.SleepAnalyses {
-		sleepDatapoints[i] = &Datapoint{
-			Qty: s.Qty,
-			Fields: map[string]interface{}{
-				"startDate": s.StartDate,
-				"endDate":   s.EndDate,
-				"value":     s.Value,
-				"source":    s.Source,
-			},
+	var data interface{}
+	switch m.Name {
+	case SleepAnalysisName:
+		if len(m.SleepAnalyses) > 0 {
+			data = m.SleepAnalyses
+			break
 		}
+		// allow aggregated sleep analysis to be handled as a Datapoint
+		fallthrough
+	default:
+		data = m.Datapoints
 	}
-	mCopy := Metric{
-		Name:  m.Name,
-		Units: m.Units,
-		Data:  sleepDatapoints,
+	bytes, err := jsoniter.Marshal(data)
+	if err != nil {
+		return nil, err
 	}
-	return jsoniter.Marshal((metricCopy)(mCopy))
-
+	intermediate.Data = bytes
+	return jsoniter.Marshal(intermediate)
 }
 
 func (w *Workout) MarshalJSON() ([]byte, error) {

@@ -21,7 +21,7 @@ var (
 	MetricActiveEnergy = &healthautoexport.Metric{
 		Name:  "active_energy",
 		Units: "kJ",
-		Data: []*healthautoexport.Datapoint{
+		Datapoints: []*healthautoexport.Datapoint{
 			{
 				Qty:  0.76856774374845116,
 				Date: mktime("2021-12-24 00:04:00 +0800"),
@@ -46,7 +46,7 @@ var (
 				{
 					Name:  "sleep_analysis",
 					Units: "hr",
-					Data: []*healthautoexport.Datapoint{
+					Datapoints: []*healthautoexport.Datapoint{
 						{
 							Date: mktime("2021-12-18 09:03:36 +0800"),
 							Fields: healthautoexport.DatapointFields{

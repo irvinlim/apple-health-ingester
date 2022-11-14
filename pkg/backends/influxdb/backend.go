@@ -110,12 +110,12 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 func (b *Backend) getMetricPoints(
 	measurement string, metric *healthautoexport.Metric, targetName string,
 ) []*write.Point {
-	points := make([]*write.Point, 0, len(metric.Data))
+	points := make([]*write.Point, 0, len(metric.Datapoints))
 	tags := b.MakeTags(map[string]string{
 		"target_name": targetName,
 	})
 
-	for _, datum := range metric.Data {
+	for _, datum := range metric.Datapoints {
 		fields := make(map[string]interface{})
 
 		// Add qty if set

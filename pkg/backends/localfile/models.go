@@ -25,6 +25,6 @@ func (f MetricFile) GetFileName() string {
 func (f *MetricFile) FromMetric(metric *healthautoexport.Metric, target string) {
 	f.Name = metric.Name
 	f.Units = metric.Units
-	f.Data = metric.Data
+	f.Data = metric.Datapoints
 	f.Target = target
 }
