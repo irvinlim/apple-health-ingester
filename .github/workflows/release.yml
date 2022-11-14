@@ -1,15 +1,66 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - '*'
   workflow_dispatch:
-    inputs:
-      release_version:
-        description: Version to release (vX.X.X)
-        required: true
-        type: string
 
 jobs:
-  release:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
+      go_version: ${{ steps.go_version.outputs.GO_VERSION }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Fetch all tags
+        run: git fetch --force --tags
+      - name: Get the tag
+        id: tag_name
+        run: echo "TAG_NAME=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+      - name: Determine Go version from go.mod
+        id: go_version
+        run: echo "GO_VERSION=$(grep "go 1." go.mod | cut -d " " -f 2)" >> $GITHUB_OUTPUT
+
+  release-docker:
+    runs-on: ubuntu-latest
+    needs: metadata
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ needs.metadata.outputs.go_version }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Docker Login
+        uses: docker/login-action@v1
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Prepare image distribution name
+        run: echo "IMAGE=${{ secrets.DOCKER_HUB_USERNAME }}/apple-health-ingester" >> $GITHUB_ENV
+
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ needs.metadata.outputs.tag_name }}
+
+  release-artifacts:
     strategy:
       matrix:
         GOOS: [linux, darwin]
@@ -19,16 +70,16 @@ jobs:
             GOARCH: arm
 
     runs-on: ubuntu-latest
+    needs: metadata
     env:
-      executable:  apple-health-ingester-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
+      executable: apple-health-ingester-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Install Go
-        uses: actions/setup-go@v3
+      - uses: actions/checkout@v3
         with:
-          go-version: ^1.19
+          fetch-depth: 0
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ needs.metadata.outputs.go_version }}
 
       - name: Get dependencies
         run: go get -v -t -d ./...
@@ -45,6 +96,6 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ${{env.executable}}
-          tag: ${{inputs.release_version}}
+          tag: ${{ needs.metadata.outputs.tag_name }}
           commit: main
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -19,18 +18,13 @@ import (
 // will be stored as single Points (i.e. time-series data).
 type Backend struct {
 	ctx        context.Context
-	client     influxdb2.Client
+	client     Client
 	staticTags map[string]string
 }
 
 var _ backends.Backend = &Backend{}
 
-func NewBackend() (backends.Backend, error) {
-	client, err := NewInfluxDBClient()
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot create influxdb client")
-	}
-
+func NewBackend(client Client) (backends.Backend, error) {
 	backend := &Backend{
 		ctx:        context.TODO(),
 		client:     client,
@@ -54,6 +48,15 @@ func (b *Backend) Name() string {
 }
 
 func (b *Backend) Write(payload *healthautoexport.Payload, targetName string) error {
+	// Properly handle nil data.
+	if payload.Data == nil {
+		log.WithFields(log.Fields{
+			"backend": b.Name(),
+			"target":  targetName,
+		}).Warn("empty payload data received, skipping")
+		return nil
+	}
+
 	// Write metrics.
 	if err := b.writeMetrics(payload.Data.Metrics, targetName); err != nil {
 		return errors.Wrapf(err, "write metrics error")
@@ -78,7 +81,6 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 	startTime := time.Now()
 	logger.Info("start writing all metrics")
 
-	api := b.client.WriteAPIBlocking(orgName, metricsBucketName)
 	for _, metric := range metrics {
 		measurementName := GetUnitizedMeasurementName(metric.Name, metric)
 		points := b.getMetricPoints(measurementName, metric, targetName)
@@ -90,7 +92,7 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 			startTime := time.Now()
 			count += len(points)
 			logger.Debug("writing metric points")
-			if err := api.WritePoint(b.ctx, points...); err != nil {
+			if err := b.client.WriteMetrics(b.ctx, points...); err != nil {
 				return errors.Wrapf(err, "write error for %v", measurementName)
 			}
 			logger.WithField("elapsed", time.Since(startTime)).Debug("write metric points success")
@@ -173,8 +175,6 @@ func (b *Backend) writeWorkouts(workouts []*healthautoexport.Workout, targetName
 	startTime := time.Now()
 	logger.Info("start writing all workouts")
 
-	api := b.client.WriteAPIBlocking(orgName, workoutsBucketName)
-
 	for _, workout := range workouts {
 		points := make([]*write.Point, 0)
 
@@ -207,7 +207,7 @@ func (b *Backend) writeWorkouts(workouts []*healthautoexport.Workout, targetName
 			startTime := time.Now()
 			count += len(points)
 			logger.Debug("writing workout points")
-			if err := api.WritePoint(b.ctx, points...); err != nil {
+			if err := b.client.WriteWorkouts(b.ctx, points...); err != nil {
 				return errors.Wrapf(err, "write error for workout")
 			}
 			logger.WithField("elapsed", time.Since(startTime)).Debug("write workout points success")

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/irvinlim/apple-health-ingester/pkg/backends"
+	apierrors "github.com/irvinlim/apple-health-ingester/pkg/errors"
 	"github.com/irvinlim/apple-health-ingester/pkg/healthautoexport"
 )
 
@@ -137,10 +139,12 @@ func (i *Ingester) processQueue(backend *backends.BackendQueue) {
 		logger = logger.WithField("elapsed", time.Since(startTime))
 
 		if err != nil {
-			backend.Queue.AddRateLimited(item)
-			logger.WithError(err).
-				WithField("retries", backend.Queue.NumRequeues(item)).
-				Error("write data error")
+			if apierrors.IsRetryableWrite(err) {
+				backend.Queue.AddRateLimited(item)
+				logger = logger.WithField("retries", backend.Queue.NumRequeues(item))
+			}
+
+			logger.WithError(err).Error("write data error")
 		} else {
 			logger.Info("write data success")
 		}
@@ -149,11 +153,23 @@ func (i *Ingester) processQueue(backend *backends.BackendQueue) {
 	}
 }
 
-func (i *Ingester) processWriteItem(item interface{}, backend backends.Backend) error {
+func (i *Ingester) processWriteItem(item interface{}, backend backends.Backend) (err error) {
 	payload, ok := item.(*PayloadWithTarget)
 	if !ok {
 		return fmt.Errorf("cannot convert to *Payload")
 	}
+
+	// Handle panics in backend implementations.
+	defer func() {
+		if r := recover(); r != nil {
+			log.WithFields(log.Fields{
+				"backend": backend.Name(),
+				"payload": payload,
+			}).Error("recovered from panic in backend:\n" + string(debug.Stack()))
+			err = errors.New("recovered from panic")
+		}
+	}()
+
 	if err := backend.Write(payload.Payload, payload.TargetName); err != nil {
 		return errors.Wrapf(err, "cannot write payload to database")
 	}
