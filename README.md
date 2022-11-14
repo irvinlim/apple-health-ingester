@@ -45,8 +45,12 @@ Usage of ./build/ingester:
       --backend.influxdb                     Enable the InfluxDB storage backend.
       --backend.localfile                    Enable the LocalFile storage backend.
       --http.authToken string                Optional authorization token that will be used to authenticate incoming requests.
+      --http.certFile string                 Certificate file for TLS support.
+      --http.enableTLS                       Enable TLS/HTTPS. Requires setting certificate and key files.
+      --http.keyFile string                  Key file for TLS support.
       --http.listenAddr string               Address to listen on. (default ":8080")
       --influxdb.authToken string            Auth token to connect to InfluxDB.
+      --influxdb.insecureSkipVerify          Skip TLS verification of the certificate chain and host name for the InfluxDB server.
       --influxdb.metricsBucketName string    InfluxDB bucket name for metrics.
       --influxdb.orgName string              InfluxDB organization name.
       --influxdb.serverURL string            Server URL for InfluxDB.
