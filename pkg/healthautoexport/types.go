@@ -34,8 +34,9 @@ type Metric struct {
 	SleepAnalyses []*SleepAnalysis `json:"-"`
 }
 
+// SleepAnalysis defines a period during sleep of various types (Value).
+// It is only valid for non-aggregate sleep analysis data ("Aggregate Sleep Data" is disabled)
 type SleepAnalysis struct {
-	// Start/EndDate only defined for sleep_analysis if "Aggregate Sleep Data" is disabled
 	StartDate *Time  `json:"startDate"`
 	EndDate   *Time  `json:"endDate"`
 	Qty       Qty    `json:"qty,omitempty"`
