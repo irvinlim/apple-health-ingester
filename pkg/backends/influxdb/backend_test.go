@@ -57,8 +57,8 @@ func TestBackend(t *testing.T) {
 			name:    "write non aggregated sleep analysis metrics",
 			payload: fixtures.PayloadMetricsSleepAnalysisNonAggregated,
 			wantMetrics: []string{
-				`sleep_analysis_hr,source=Irvin's\ Apple\ Watch,target_name=test,value=Core state=1i 1639765266000000000`,
-				`sleep_analysis_hr,source=Irvin's\ Apple\ Watch,target_name=test,value=Core qty=6.108333333333333,state=0i 1639789026000000000`,
+				`sleep_analysis_detailed,source=Irvin's\ Apple\ Watch,target_name=test,value=Core state=1i 1639765266000000000`,
+				`sleep_analysis_detailed,source=Irvin's\ Apple\ Watch,target_name=test,value=Core qty=6.108333333333333,state=0i 1639789026000000000`,
 			},
 		},
 		{
