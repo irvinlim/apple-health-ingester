@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -19,14 +21,33 @@ func createLoggingHandler(logger *log.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			startTime := time.Now()
+
+			// If verbose logging is enabled, intercept the request body with TeeReader before continuing.
+			var buf bytes.Buffer
+			if logger.IsLevelEnabled(log.DebugLevel) {
+				type readCloser struct {
+					io.Reader
+					io.Closer
+				}
+				bodyCopy := io.TeeReader(r.Body, &buf)
+				r.Body = readCloser{Reader: bodyCopy, Closer: r.Body}
+			}
+
 			defer func() {
-				logger.WithFields(log.Fields{
+				lgr := logger.WithFields(log.Fields{
 					"method":      r.Method,
 					"path":        r.URL.Path,
 					"remote_addr": r.RemoteAddr,
 					"user_agent":  r.UserAgent(),
 					"elapsed":     time.Since(startTime),
-				}).Info("http request")
+				})
+
+				// Print request body if captured.
+				if readBytes, err := io.ReadAll(&buf); err == nil && len(readBytes) > 0 {
+					lgr = lgr.WithField("body", string(readBytes))
+				}
+
+				lgr.Info("http request")
 			}()
 			next.ServeHTTP(w, r)
 		})
