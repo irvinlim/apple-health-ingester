@@ -25,8 +25,12 @@ func createLoggingHandler(logger *log.Logger) func(http.Handler) http.Handler {
 			// If verbose logging is enabled, intercept the request body with TeeReader before continuing.
 			var buf bytes.Buffer
 			if logger.IsLevelEnabled(log.DebugLevel) {
+				type readCloser struct {
+					io.Reader
+					io.Closer
+				}
 				bodyCopy := io.TeeReader(r.Body, &buf)
-				r.Body = io.NopCloser(bodyCopy)
+				r.Body = readCloser{Reader: bodyCopy, Closer: r.Body}
 			}
 
 			defer func() {
