@@ -46,19 +46,16 @@ var (
 				{
 					Name:  "sleep_analysis",
 					Units: "hr",
-					Datapoints: []*healthautoexport.Datapoint{
+					AggregateSleepAnalyses: []*healthautoexport.AggregateSleepAnalysis{
 						{
-							Date: mktime("2021-12-18 09:03:36 +0800"),
-							Fields: healthautoexport.DatapointFields{
-								"asleep":      6.108333333333333,
-								"sleepStart":  mktime("2021-12-18 02:21:06 +0800"),
-								"sleepEnd":    mktime("2021-12-18 08:57:06 +0800"),
-								"sleepSource": "Irvin’s Apple Watch",
-								"inBed":       6.809728874299261,
-								"inBedStart":  mktime("2021-12-18 02:12:50 +0800"),
-								"inBedEnd":    mktime("2021-12-18 09:04:45 +0800"),
-								"inBedSource": "iPhone",
-							},
+							Asleep:      6.108333333333333,
+							SleepStart:  mktime("2021-12-18 02:21:06 +0800"),
+							SleepEnd:    mktime("2021-12-18 08:57:06 +0800"),
+							SleepSource: "Irvin’s Apple Watch",
+							InBed:       6.809728874299261,
+							InBedStart:  mktime("2021-12-18 02:12:50 +0800"),
+							InBedEnd:    mktime("2021-12-18 09:04:45 +0800"),
+							InBedSource: "iPhone",
 						},
 					},
 				},

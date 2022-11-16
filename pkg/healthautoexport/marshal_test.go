@@ -36,7 +36,7 @@ func TestMarshalToString(t *testing.T) {
 			want:    `{"data":{"workouts":[{"name":"Walking","start":"2021-12-24 08:02:43 +0800","end":"2021-12-24 08:21:53 +0800","heartRateData":[{"qty":108,"date":"2021-12-24 08:02:47 +0800","units":"bpm"}],"elevation":{"units":"m","ascent":16.36,"descent":0},"stepCount":{"qty":908,"units":"steps"},"activeEnergy":{"qty":226.21122641832523,"units":"kJ"},"route":[{"lat":38.8951,"lon":-77.0364,"altitude":8.02762222290039,"timestamp":"2021-12-24 08:04:45 +0800"}],"heartRateRecovery":null}]}}`,
 		},
 		{
-			name:    "marshal sleep analysis custom datapoint fields",
+			name:    "marshal aggregated sleep analysis",
 			payload: fixtures.PayloadMetricsSleepAnalysis,
 			want: `{
   "data": {
@@ -212,7 +212,7 @@ func TestUnmarshalFromString(t *testing.T) {
 }`,
 		},
 		{
-			name: "unmarshal sleep analysis custom datapoint fields",
+			name: "unmarshal aggregated sleep analysis",
 			want: fixtures.PayloadMetricsSleepAnalysis,
 			input: `{
   "data": {
