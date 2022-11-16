@@ -19,8 +19,11 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Set log level
-	if logLevel > 0 {
-		level := log.Level(logLevel)
+	if logLevel != "" {
+		level, err := log.ParseLevel(logLevel)
+		if err != nil {
+			log.Fatalf("cannot parse log level: %v", logLevel)
+		}
 		log.WithField("log_level", level).Info("setting log level")
 		log.SetLevel(level)
 	}
