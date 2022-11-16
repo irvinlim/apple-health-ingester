@@ -3,6 +3,9 @@ package healthautoexport
 // API document: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format
 
 import (
+	"encoding/json"
+	"reflect"
+	"strings"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -11,7 +14,8 @@ import (
 
 const (
 	// TimeFormat is the format to parse time.Time in this package.
-	TimeFormat = "2006-01-02 15:04:05 -0700"
+	TimeFormat        = "2006-01-02 15:04:05 -0700"
+	SleepAnalysisName = "sleep_analysis"
 )
 
 type Payload struct {
@@ -25,12 +29,33 @@ type PayloadData struct {
 
 // Metric defines a single measurement with units, as well as time-series data points.
 type Metric struct {
-	Name  string       `json:"name"`
-	Units Units        `json:"units"`
-	Data  []*Datapoint `json:"data"`
+	Name          string           `json:"name"`
+	Units         Units            `json:"units"`
+	Datapoints    []*Datapoint     `json:"-"`
+	SleepAnalyses []*SleepAnalysis `json:"-"`
 }
 
-func (m Metric) GetUnits() Units {
+// metricCopy avoids reflection stack overflow by creating type alias of Metric.
+// https://stackoverflow.com/a/43178272/2037090
+type metricCopy Metric
+
+// jsonMetric is used to support JSON marshal/unmarshalling of Metric
+type jsonMetric struct {
+	*metricCopy
+	Data json.RawMessage `json:"data"`
+}
+
+// SleepAnalysis defines a period during sleep of various types (Value).
+// It is only valid for non-aggregate sleep analysis data ("Aggregate Sleep Data" is disabled)
+type SleepAnalysis struct {
+	StartDate *Time  `json:"startDate"`
+	EndDate   *Time  `json:"endDate"`
+	Qty       Qty    `json:"qty,omitempty"`
+	Source    string `json:"source"`
+	Value     string `json:"value"`
+}
+
+func (m *Metric) GetUnits() Units {
 	return m.Units
 }
 
@@ -60,6 +85,63 @@ type WorkoutFields map[string]*QtyWithUnit
 // workoutCopy avoids reflection stack overflow by creating type alias of Workout.
 // https://stackoverflow.com/a/43178272/2037090
 type workoutCopy Workout
+
+func (m *Metric) UnmarshalJSON(bytes []byte) error {
+	intermediate := jsonMetric{
+		metricCopy: (*metricCopy)(m),
+	}
+	if err := jsoniter.Unmarshal(bytes, &intermediate); err != nil {
+		return err
+	}
+	switch m.Name {
+	case SleepAnalysisName:
+		var sa []*SleepAnalysis
+		if err := jsoniter.Unmarshal(intermediate.Data, &sa); err != nil {
+			return err
+		}
+		// only process as SleepAnalysis if Value field is set
+		if len(sa) > 0 && sa[0].Value != "" {
+			m.SleepAnalyses = sa
+			return nil
+		}
+		// process aggregated sleep_analysis like other fields
+		fallthrough
+	default:
+		if intermediate.Data == nil {
+			return nil
+		}
+		var d []*Datapoint
+		if err := jsoniter.Unmarshal(intermediate.Data, &d); err != nil {
+			return err
+		}
+		m.Datapoints = d
+		return nil
+	}
+}
+
+func (m *Metric) MarshalJSON() ([]byte, error) {
+	intermediate := jsonMetric{
+		metricCopy: (*metricCopy)(m),
+	}
+	var data interface{}
+	switch m.Name {
+	case SleepAnalysisName:
+		if len(m.SleepAnalyses) > 0 {
+			data = m.SleepAnalyses
+			break
+		}
+		// allow aggregated sleep analysis to be handled as a Datapoint
+		fallthrough
+	default:
+		data = m.Datapoints
+	}
+	bytes, err := jsoniter.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	intermediate.Data = bytes
+	return jsoniter.Marshal(intermediate)
+}
 
 func (w *Workout) MarshalJSON() ([]byte, error) {
 	// Marshal and unmarshal Fields into a generic map
@@ -190,8 +272,13 @@ func (w *Datapoint) UnmarshalJSON(bytes []byte) error {
 	if err := jsoniter.Unmarshal(bytes, &fields); err != nil {
 		return err
 	}
-	delete(fields, "qty")
-	delete(fields, "date")
+
+	t := reflect.TypeOf(*w)
+	// remove already parsed fields in Datapoint struct, leaving only unknown fields
+	for i := 0; i < t.NumField(); i++ {
+		jsonTag := t.Field(i).Tag.Get("json")
+		delete(fields, strings.Split(jsonTag, ",")[0])
+	}
 
 	// Try to unmarshal special types, otherwise fallback to normal json.Unmarshaler.
 	w.Fields = make(DatapointFields)

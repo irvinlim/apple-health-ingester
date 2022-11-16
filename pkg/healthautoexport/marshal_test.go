@@ -62,6 +62,30 @@ func TestMarshalToString(t *testing.T) {
   }
 }`,
 		},
+		{
+			name:    "marshal non-aggregated sleep analysis",
+			payload: fixtures.PayloadMetricsSleepAnalysisNonAggregated,
+			want: `{
+	"data": {
+		"metrics": [
+			{
+				"name": "sleep_analysis",
+				"units": "hr",
+				"data": [
+					{
+						"source": "Irvin's Apple Watch",
+						"startDate": "2021-12-18 02:21:06 +0800",
+						"endDate": "2021-12-18 08:57:06 +0800",
+						"value": "Core",
+						"date": null,
+						"qty": 6.108333333333333
+					}
+				]
+			}
+		]
+	}
+}`,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -212,6 +236,30 @@ func TestUnmarshalFromString(t *testing.T) {
       }
     ]
   }
+}`,
+		},
+		{
+			name: "unmarshal non-aggregated sleep analysis",
+			want: fixtures.PayloadMetricsSleepAnalysisNonAggregated,
+			input: `{
+	"data": {
+		"metrics": [
+			{
+				"name": "sleep_analysis",
+				"units": "hr",
+				"data": [
+					{
+						"source": "Irvin's Apple Watch",
+						"startDate": "2021-12-18 02:21:06 +0800",
+						"endDate": "2021-12-18 08:57:06 +0800",
+						"value": "Core",
+						"date": null,
+						"qty": 6.108333333333333
+					}
+				]
+			}
+		]
+	}
 }`,
 		},
 	}

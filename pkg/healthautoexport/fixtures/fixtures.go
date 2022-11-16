@@ -21,7 +21,7 @@ var (
 	MetricActiveEnergy = &healthautoexport.Metric{
 		Name:  "active_energy",
 		Units: "kJ",
-		Data: []*healthautoexport.Datapoint{
+		Datapoints: []*healthautoexport.Datapoint{
 			{
 				Qty:  0.76856774374845116,
 				Date: mktime("2021-12-24 00:04:00 +0800"),
@@ -46,7 +46,7 @@ var (
 				{
 					Name:  "sleep_analysis",
 					Units: "hr",
-					Data: []*healthautoexport.Datapoint{
+					Datapoints: []*healthautoexport.Datapoint{
 						{
 							Date: mktime("2021-12-18 09:03:36 +0800"),
 							Fields: healthautoexport.DatapointFields{
@@ -104,6 +104,26 @@ var (
 						"activeEnergy": &healthautoexport.QtyWithUnit{
 							Qty:   226.21122641832523,
 							Units: "kJ",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	PayloadMetricsSleepAnalysisNonAggregated = &healthautoexport.Payload{
+		Data: &healthautoexport.PayloadData{
+			Metrics: []*healthautoexport.Metric{
+				{
+					Name:  "sleep_analysis",
+					Units: "hr",
+					SleepAnalyses: []*healthautoexport.SleepAnalysis{
+						{
+							StartDate: mktime("2021-12-18 02:21:06 +0800"),
+							EndDate:   mktime("2021-12-18 08:57:06 +0800"),
+							Qty:       6.108333333333333,
+							Source:    "Irvin's Apple Watch",
+							Value:     "Core",
 						},
 					},
 				},
