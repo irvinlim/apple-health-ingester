@@ -14,6 +14,11 @@ import (
 	"github.com/irvinlim/apple-health-ingester/pkg/healthautoexport"
 )
 
+const (
+	SleepAnalysisDetailed   = "sleep_analysis_detailed"
+	SleepAnalysisAggregated = "sleep_analysis_aggregated"
+)
+
 // Backend InfluxDB is used to store ingested metrics into InfluxDB. All metrics
 // will be stored as single Points (i.e. time-series data).
 type Backend struct {
@@ -82,18 +87,17 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 	logger.Info("start writing all metrics")
 
 	for _, metric := range metrics {
-		measurementName := GetUnitizedMeasurementName(metric.Name, metric)
-		points := b.getMetricPoints(measurementName, metric, targetName)
+		points := b.getMetricPoints(metric, targetName)
 		if len(points) > 0 {
 			logger := logger.WithFields(log.Fields{
-				"measurement": measurementName,
+				"metric_name": metric.Name,
 				"count":       len(points),
 			})
 			startTime := time.Now()
 			count += len(points)
 			logger.Debug("writing metric points")
 			if err := b.client.WriteMetrics(b.ctx, points...); err != nil {
-				return errors.Wrapf(err, "write error for %v", measurementName)
+				return errors.Wrapf(err, "write error for %v", metric.Name)
 			}
 			logger.WithField("elapsed", time.Since(startTime)).Debug("write metric points success")
 		}
@@ -107,14 +111,14 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 	return nil
 }
 
-func (b *Backend) getMetricPoints(
-	measurement string, metric *healthautoexport.Metric, targetName string,
-) []*write.Point {
+func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, targetName string) []*write.Point {
+
 	points := make([]*write.Point, 0, len(metric.Datapoints))
 	tags := b.MakeTags(map[string]string{
 		"target_name": targetName,
 	})
 
+	datapointMeasurement := GetUnitizedMeasurementName(metric.Name, metric)
 	for _, datum := range metric.Datapoints {
 		fields := make(map[string]interface{})
 
@@ -133,7 +137,7 @@ func (b *Backend) getMetricPoints(
 			continue
 		}
 
-		point := write.NewPoint(measurement, tags, fields, datum.Date.Time)
+		point := write.NewPoint(datapointMeasurement, tags, fields, datum.Date.Time)
 		points = append(points, point)
 	}
 
@@ -152,12 +156,12 @@ func (b *Backend) getMetricPoints(
 
 		// start point has state = 1 (on)
 		startFields["state"] = 1
-		startPoint := write.NewPoint(measurement, tags, startFields, sleepAnalysis.StartDate.Time)
+		startPoint := write.NewPoint(SleepAnalysisDetailed, tags, startFields, sleepAnalysis.StartDate.Time)
 		points = append(points, startPoint)
 
 		// end point has state = 0 (off)
 		endFields["state"] = 0
-		endPoint := write.NewPoint(measurement, tags, endFields, sleepAnalysis.EndDate.Time)
+		endPoint := write.NewPoint(SleepAnalysisDetailed, tags, endFields, sleepAnalysis.EndDate.Time)
 		points = append(points, endPoint)
 	}
 
