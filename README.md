@@ -85,7 +85,7 @@ Usage of ./build/ingester:
       --influxdb.staticTags strings          Additional tags to add to InfluxDB for every single request, in key=value format.
       --influxdb.workoutsBucketName string   InfluxDB bucket name for workouts.
       --localfile.metricsPath string         Output path to write metrics, with one metric per file. All data will be aggregated by timestamp. Any existing data will be merged together.
-      --log uint32                           Log level to use, defaults to 4 (INFO).
+      --log string                           Log level to use. (default "info")
 ```
 
 ### Global Configuration
@@ -108,7 +108,15 @@ To enable TLS, the following flags must be provided:
 
 #### `log`
 
-Specify the log level. Larger values imply for greater log verbosity, and follow the log levels from [logrus](https://github.com/sirupsen/logrus/blob/f8bf7650dccb756cea26edaf9217aab85500fe07/logrus.go#L91-L112). Defaults to 4 (`INFO`).
+Specify the log level. The following log levels are supported, and in order of verbosity from lowest to highest:
+
+- `panic`
+- `fatal`
+- `error`
+- `warn`/`warning`
+- `info` (default)
+- `debug`
+- `trace`
 
 ## Supported Backends
 
