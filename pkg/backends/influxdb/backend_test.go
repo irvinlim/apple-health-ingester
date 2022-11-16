@@ -47,18 +47,21 @@ func TestBackend(t *testing.T) {
 			}, wantMetrics: []string{},
 		},
 		{
-			name:    "write sleep analysis metrics",
+			name:    "write aggregated sleep analysis metrics",
 			payload: fixtures.PayloadMetricsSleepAnalysis,
 			wantMetrics: []string{
-				`sleep_analysis_hr,target_name=test asleep=6.108333333333333,inBed=6.809728874299261,inBedEnd="2021-12-18T09:04:45+08:00",inBedSource="iPhone",inBedStart="2021-12-18T02:12:50+08:00",sleepEnd="2021-12-18T08:57:06+08:00",sleepSource="Irvin’s Apple Watch",sleepStart="2021-12-18T02:21:06+08:00" 1639789416000000000`,
+				`sleep_analysis_aggregated,target_name=test,source=Irvin’s\ Apple\ Watch,value=asleep state=1u 1639765266000000000`,
+				`sleep_analysis_aggregated,target_name=test,source=Irvin’s\ Apple\ Watch,value=asleep qty=6.108333333333333,state=0u 1639789026000000000`,
+				`sleep_analysis_aggregated,target_name=test,source=iPhone,value=inBed state=1u 1639764770000000000`,
+				`sleep_analysis_aggregated,target_name=test,source=iPhone,value=inBed qty=6.809728874299261,state=0u 1639789485000000000`,
 			},
 		},
 		{
 			name:    "write non aggregated sleep analysis metrics",
 			payload: fixtures.PayloadMetricsSleepAnalysisNonAggregated,
 			wantMetrics: []string{
-				`sleep_analysis_detailed,source=Irvin's\ Apple\ Watch,target_name=test,value=Core state=1i 1639765266000000000`,
-				`sleep_analysis_detailed,source=Irvin's\ Apple\ Watch,target_name=test,value=Core qty=6.108333333333333,state=0i 1639789026000000000`,
+				`sleep_analysis_detailed,target_name=test,source=Irvin's\ Apple\ Watch,value=Core state=1u 1639765266000000000`,
+				`sleep_analysis_detailed,target_name=test,source=Irvin's\ Apple\ Watch,value=Core qty=6.108333333333333,state=0u 1639789026000000000`,
 			},
 		},
 		{
