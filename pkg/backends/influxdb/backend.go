@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
+	lp "github.com/influxdata/line-protocol"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -24,7 +25,7 @@ const (
 type Backend struct {
 	ctx        context.Context
 	client     Client
-	staticTags map[string]string
+	staticTags []lp.Tag
 }
 
 var _ backends.Backend = &Backend{}
@@ -33,16 +34,19 @@ func NewBackend(client Client) (backends.Backend, error) {
 	backend := &Backend{
 		ctx:        context.TODO(),
 		client:     client,
-		staticTags: make(map[string]string),
+		staticTags: make([]lp.Tag, len(staticTags)),
 	}
 
 	// Prepare static tags.
-	for _, tag := range staticTags {
+	for i, tag := range staticTags {
 		tokens := strings.SplitN(tag, "=", 2)
 		if len(tokens) != 2 {
 			return nil, fmt.Errorf("invalid static tag %v", tag)
 		}
-		backend.staticTags[tokens[0]] = tokens[1]
+		backend.staticTags[i] = lp.Tag{
+			Key:   tokens[0],
+			Value: tokens[1],
+		}
 	}
 
 	return backend, nil
@@ -86,8 +90,13 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 	startTime := time.Now()
 	logger.Info("start writing all metrics")
 
+	tags := []lp.Tag{
+		{Key: "target_name", Value: targetName},
+	}
+	tags = append(tags, b.staticTags...)
+
 	for _, metric := range metrics {
-		points := b.getMetricPoints(metric, targetName)
+		points := b.getMetricPoints(metric, tags)
 		if len(points) > 0 {
 			logger := logger.WithFields(log.Fields{
 				"metric_name": metric.Name,
@@ -111,58 +120,48 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 	return nil
 }
 
-func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, targetName string) []*write.Point {
-
+func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, tags []lp.Tag) []*write.Point {
 	points := make([]*write.Point, 0, len(metric.Datapoints))
-	tags := b.MakeTags(map[string]string{
-		"target_name": targetName,
-	})
-
 	datapointMeasurement := GetUnitizedMeasurementName(metric.Name, metric)
 	for _, datum := range metric.Datapoints {
-		fields := make(map[string]interface{})
-
+		point := write.NewPointWithMeasurement(datapointMeasurement)
+		addTagsToPoint(point, tags)
 		// Add qty if set
 		if datum.Qty != 0 {
-			fields["qty"] = float64(datum.Qty)
+			point.AddField("qty", float64(datum.Qty))
 		}
-
 		// Add additional fields
 		for name, value := range datum.Fields {
-			fields[name] = value
+			point.AddField(name, value)
 		}
-
 		// Skip if there are no fields to write
-		if len(fields) == 0 {
+		if len(point.FieldList()) == 0 {
 			continue
 		}
-
-		point := write.NewPoint(datapointMeasurement, tags, fields, datum.Date.Time)
+		point.SetTime(datum.Date.Time)
 		points = append(points, point)
 	}
 
 	for _, s := range metric.SleepAnalyses {
-		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 1, nil, s.StartDate, targetName))
+		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 1, nil, s.StartDate, tags))
 		// end point has state = 0 (off)
-		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 0, &s.Qty, s.EndDate, targetName))
+		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 0, &s.Qty, s.EndDate, tags))
 	}
 
 	for _, a := range metric.AggregateSleepAnalyses {
-		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 1, nil, a.SleepStart, targetName))
-		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 0, &a.Asleep, a.SleepEnd, targetName))
-		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 1, nil, a.InBedStart, targetName))
-		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 0, &a.InBed, a.InBedEnd, targetName))
+		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 1, nil, a.SleepStart, tags))
+		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 0, &a.Asleep, a.SleepEnd, tags))
+		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 1, nil, a.InBedStart, tags))
+		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 0, &a.InBed, a.InBedEnd, tags))
 	}
 
 	return points
 }
 
 func makeSleepPoint(measurement string, source string, value string,
-	state uint8, qty *healthautoexport.Qty, t *healthautoexport.Time, target string) *write.Point {
+	state uint8, qty *healthautoexport.Qty, t *healthautoexport.Time, tags []lp.Tag) *write.Point {
 	point := write.NewPointWithMeasurement(measurement)
-	if target != "" {
-		point.AddTag("target_name", target)
-	}
+	addTagsToPoint(point, tags)
 	point.AddTag("source", source)
 	point.AddTag("value", value)
 	if qty != nil {
@@ -188,17 +187,19 @@ func (b *Backend) writeWorkouts(workouts []*healthautoexport.Workout, targetName
 		points := make([]*write.Point, 0)
 
 		// Create tags
-		tags := b.MakeTags(map[string]string{
-			"target_name":  targetName,
-			"workout_name": workout.Name,
-		})
+		tags := []lp.Tag{
+			{Key: "target_name", Value: targetName},
+			{Key: "workout_name", Value: workout.Name},
+		}
+		tags = append(tags, b.staticTags...)
 
 		// Create aggregate workout point
-		point, err := b.createWorkoutAggregatePoint(workout, tags)
+		point, err := b.createWorkoutAggregatePoint(workout)
 		if err != nil {
 			return errors.Wrapf(err, "conversion error for workout %+v", workout)
 		}
 		if point != nil {
+			addTagsToPoint(point, tags)
 			points = append(points, point)
 		}
 
@@ -231,91 +232,79 @@ func (b *Backend) writeWorkouts(workouts []*healthautoexport.Workout, targetName
 	return nil
 }
 
-func (b *Backend) createWorkoutAggregatePoint(workout *healthautoexport.Workout, tags map[string]string) (*write.Point, error) {
+func (b *Backend) createWorkoutAggregatePoint(workout *healthautoexport.Workout) (*write.Point, error) {
 	// Skip if the workout has no start time (probably invalid)
 	if workout.Start.IsZero() {
 		return nil, errors.New("workout has no start time")
 	}
-
+	point := write.NewPointWithMeasurement("workout")
 	// Compute fields from workout
 	workoutFields := CreateWorkoutStatistics(workout)
-
 	// Add elevation fields
 	if workout.Elevation != nil {
-		workoutFields["elevation_ascent"] = &healthautoexport.QtyWithUnit{
-			Qty:   workout.Elevation.Ascent,
-			Units: workout.Elevation.Units,
-		}
-		workoutFields["elevation_descent"] = &healthautoexport.QtyWithUnit{
-			Qty:   workout.Elevation.Descent,
-			Units: workout.Elevation.Units,
-		}
+		workoutFields = append(workoutFields, healthautoexport.Field{
+			Key: "elevation_ascent",
+			Value: &healthautoexport.QtyWithUnit{
+				Qty:   workout.Elevation.Ascent,
+				Units: workout.Elevation.Units,
+			},
+		}, healthautoexport.Field{
+			Key: "elevation_descent",
+			Value: &healthautoexport.QtyWithUnit{
+				Qty:   workout.Elevation.Descent,
+				Units: workout.Elevation.Units,
+			},
+		})
 	}
-
 	// Add other WorkoutFields
-	for name, field := range workout.Fields {
-		workoutFields[name] = field
-	}
-
+	workoutFields = append(workoutFields, workout.Fields...)
 	// Convert to InfluxDB field format
-	fields := MakeInfluxFieldsFromWorkoutFields(workoutFields)
-
+	for _, field := range workoutFields {
+		fieldName := GetUnitizedMeasurementName(field.Key, field.Value)
+		point.AddField(fieldName, float64(field.Value.Qty))
+	}
 	// Skip if there are no fields to write
-	if len(fields) == 0 {
+	if len(point.FieldList()) == 0 {
 		return nil, nil
 	}
-
-	point := write.NewPoint("workout", tags, fields, workout.Start.Time)
+	point.SetTime(workout.Start.Time)
 	return point, nil
 }
 
 func (b *Backend) createWorkoutPoints(
-	name string, tags map[string]string, data []*healthautoexport.DatapointWithUnit,
+	name string, tags []lp.Tag, data []*healthautoexport.DatapointWithUnit,
 ) []*write.Point {
 	points := make([]*write.Point, 0, len(data))
 	for _, datum := range data {
-		measurement := GetUnitizedMeasurementName(name, datum)
-		fields := map[string]interface{}{
-			"qty": float64(datum.Qty),
-		}
-		point := write.NewPoint(measurement, tags, fields, datum.Date.Time)
+		point := write.NewPointWithMeasurement(GetUnitizedMeasurementName(name, datum))
+		addTagsToPoint(point, tags)
+		point.AddField("qty", float64(datum.Qty))
+		point.SetTime(datum.Date.Time)
 		points = append(points, point)
 	}
 	return points
 }
 
 func (b *Backend) createRoutePoints(
-	name string, tags map[string]string, data []*healthautoexport.RouteDatapoint,
+	name string, tags []lp.Tag, data []*healthautoexport.RouteDatapoint,
 ) []*write.Point {
 	points := make([]*write.Point, 0, len(data))
 	for _, datum := range data {
-		measurement := name
-		fields := map[string]interface{}{
-			"lat":      datum.Lat,
-			"lon":      datum.Lon,
-			"altitude": datum.Altitude,
-		}
-		point := write.NewPoint(measurement, tags, fields, datum.Timestamp.Time)
+		point := write.NewPointWithMeasurement(name)
+		addTagsToPoint(point, tags)
+		point.AddField("lat", datum.Lat)
+		point.AddField("lon", datum.Lon)
+		point.AddField("altitude", datum.Altitude)
+		point.SetTime(datum.Timestamp.Time)
 		points = append(points, point)
 	}
 	return points
 }
 
-// MakeTags returns a map of tags that can be safely modified.
-// Accepts a targetName, which if not empty, will be added to the map.
-func (b *Backend) MakeTags(additional map[string]string) map[string]string {
-	tags := make(map[string]string, len(b.staticTags))
-	for k, v := range b.staticTags {
-		if v != "" {
-			tags[k] = v
-		}
+func addTagsToPoint(point *write.Point, tags []lp.Tag) {
+	for _, tag := range tags {
+		point.AddTag(tag.Key, tag.Value)
 	}
-	for k, v := range additional {
-		if v != "" {
-			tags[k] = v
-		}
-	}
-	return tags
 }
 
 type WithUnits interface {
@@ -326,14 +315,4 @@ type WithUnits interface {
 // It will add a suffix for the unit to the measurement name.
 func GetUnitizedMeasurementName(name string, metric WithUnits) string {
 	return name + "_" + string(metric.GetUnits())
-}
-
-// MakeInfluxFieldsFromWorkoutFields converts WorkoutFields to InfluxDB fields.
-func MakeInfluxFieldsFromWorkoutFields(fields healthautoexport.WorkoutFields) map[string]interface{} {
-	result := make(map[string]interface{}, len(fields))
-	for name, field := range fields {
-		fieldName := GetUnitizedMeasurementName(name, field)
-		result[fieldName] = float64(field.Qty)
-	}
-	return result
 }

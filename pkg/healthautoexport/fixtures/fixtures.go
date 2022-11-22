@@ -94,13 +94,19 @@ var (
 						Descent: 0,
 					},
 					Fields: healthautoexport.WorkoutFields{
-						"stepCount": &healthautoexport.QtyWithUnit{
-							Qty:   908,
-							Units: "steps",
+						{
+							Key: "activeEnergy",
+							Value: &healthautoexport.QtyWithUnit{
+								Qty:   226.21122641832523,
+								Units: "kJ",
+							},
 						},
-						"activeEnergy": &healthautoexport.QtyWithUnit{
-							Qty:   226.21122641832523,
-							Units: "kJ",
+						{
+							Key: "stepCount",
+							Value: &healthautoexport.QtyWithUnit{
+								Qty:   908,
+								Units: "steps",
+							},
 						},
 					},
 				},
