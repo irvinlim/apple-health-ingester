@@ -124,7 +124,7 @@ func (m *Metric) UnmarshalJSON(bytes []byte) error {
 			return err
 		}
 		// only process as AggregatedSleepAnalysis if first item parses to non-empty AggregatedSleepAnalysis
-		if if len(agg) > 0 && *agg[0] != (AggregatedSleepAnalysis{}) {
+		if len(agg) > 0 && *agg[0] != (AggregatedSleepAnalysis{}) {
 			m.AggregatedSleepAnalyses = agg
 			return nil
 		}
