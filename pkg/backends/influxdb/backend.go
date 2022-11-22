@@ -147,7 +147,7 @@ func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, targetName st
 		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 0, &s.Qty, s.EndDate, targetName))
 	}
 
-	for _, a := range metric.AggregateSleepAnalyses {
+	for _, a := range metric.AggregatedSleepAnalyses {
 		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 1, nil, a.SleepStart, targetName))
 		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 0, &a.Asleep, a.SleepEnd, targetName))
 		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 1, nil, a.InBedStart, targetName))

@@ -29,11 +29,11 @@ type PayloadData struct {
 
 // Metric defines a single measurement with units, as well as time-series data points.
 type Metric struct {
-	Name                   string                    `json:"name"`
-	Units                  Units                     `json:"units"`
-	Datapoints             []*Datapoint              `json:"-"`
-	SleepAnalyses          []*SleepAnalysis          `json:"-"`
-	AggregateSleepAnalyses []*AggregateSleepAnalysis `json:"-"`
+	Name                    string                     `json:"name"`
+	Units                   Units                      `json:"units"`
+	Datapoints              []*Datapoint               `json:"-"`
+	SleepAnalyses           []*SleepAnalysis           `json:"-"`
+	AggregatedSleepAnalyses []*AggregatedSleepAnalysis `json:"-"`
 }
 
 // metricCopy avoids reflection stack overflow by creating type alias of Metric.
@@ -56,9 +56,9 @@ type SleepAnalysis struct {
 	Value     string `json:"value"`
 }
 
-// AggregateSleepAnalysis defines an aggregated period of an entire night of sleep.
+// AggregatedSleepAnalysis defines an aggregated period of an entire night of sleep.
 // It is only valid for aggregate sleep analysis data ("Aggregate Sleep Data" is enabled)
-type AggregateSleepAnalysis struct {
+type AggregatedSleepAnalysis struct {
 	// we don't parse "date" which doesn't seem to have useful interesting information
 	Asleep      Qty    `json:"asleep"`
 	SleepSource string `json:"sleepSource"`
@@ -115,17 +115,17 @@ func (m *Metric) UnmarshalJSON(bytes []byte) error {
 			return err
 		}
 		// only process as SleepAnalysis if first item parses to non-empty SleepAnalysis
-		if *sa[0] != (SleepAnalysis{}) {
+		if len(sa) > 0 && *sa[0] != (SleepAnalysis{}) {
 			m.SleepAnalyses = sa
 			return nil
 		}
-		var agg []*AggregateSleepAnalysis
+		var agg []*AggregatedSleepAnalysis
 		if err := jsoniter.Unmarshal(intermediate.Data, &agg); err != nil {
 			return err
 		}
 		// only process as AggregatedSleepAnalysis if first item parses to non-empty AggregatedSleepAnalysis
-		if *agg[0] != (AggregateSleepAnalysis{}) {
-			m.AggregateSleepAnalyses = agg
+		if if len(agg) > 0 && *agg[0] != (AggregatedSleepAnalysis{}) {
+			m.AggregatedSleepAnalyses = agg
 			return nil
 		}
 		// if neither type of sleep analysis parsed something, parse as a Datapoint.
@@ -154,8 +154,8 @@ func (m *Metric) MarshalJSON() ([]byte, error) {
 			data = m.SleepAnalyses
 			break
 		}
-		if len(m.AggregateSleepAnalyses) > 0 {
-			data = m.AggregateSleepAnalyses
+		if len(m.AggregatedSleepAnalyses) > 0 {
+			data = m.AggregatedSleepAnalyses
 			break
 		}
 		// allow badly parsed sleep analysis to be handled as a Datapoint
