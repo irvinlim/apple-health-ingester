@@ -29,10 +29,11 @@ type PayloadData struct {
 
 // Metric defines a single measurement with units, as well as time-series data points.
 type Metric struct {
-	Name          string           `json:"name"`
-	Units         Units            `json:"units"`
-	Datapoints    []*Datapoint     `json:"-"`
-	SleepAnalyses []*SleepAnalysis `json:"-"`
+	Name                    string                     `json:"name"`
+	Units                   Units                      `json:"units"`
+	Datapoints              []*Datapoint               `json:"-"`
+	SleepAnalyses           []*SleepAnalysis           `json:"-"`
+	AggregatedSleepAnalyses []*AggregatedSleepAnalysis `json:"-"`
 }
 
 // metricCopy avoids reflection stack overflow by creating type alias of Metric.
@@ -53,6 +54,20 @@ type SleepAnalysis struct {
 	Qty       Qty    `json:"qty,omitempty"`
 	Source    string `json:"source"`
 	Value     string `json:"value"`
+}
+
+// AggregatedSleepAnalysis defines an aggregated period of an entire night of sleep.
+// It is only valid for aggregate sleep analysis data ("Aggregate Sleep Data" is enabled)
+type AggregatedSleepAnalysis struct {
+	// we don't parse "date" which doesn't seem to have useful interesting information
+	Asleep      Qty    `json:"asleep"`
+	SleepSource string `json:"sleepSource"`
+	SleepStart  *Time  `json:"sleepStart"`
+	SleepEnd    *Time  `json:"sleepEnd"`
+	InBed       Qty    `json:"inBed"`
+	InBedSource string `json:"inBedSource"`
+	InBedStart  *Time  `json:"inBedStart"`
+	InBedEnd    *Time  `json:"inBedEnd"`
 }
 
 func (m *Metric) GetUnits() Units {
@@ -99,12 +114,21 @@ func (m *Metric) UnmarshalJSON(bytes []byte) error {
 		if err := jsoniter.Unmarshal(intermediate.Data, &sa); err != nil {
 			return err
 		}
-		// only process as SleepAnalysis if Value field is set
-		if len(sa) > 0 && sa[0].Value != "" {
+		// only process as SleepAnalysis if first item parses to non-empty SleepAnalysis
+		if len(sa) > 0 && *sa[0] != (SleepAnalysis{}) {
 			m.SleepAnalyses = sa
 			return nil
 		}
-		// process aggregated sleep_analysis like other fields
+		var agg []*AggregatedSleepAnalysis
+		if err := jsoniter.Unmarshal(intermediate.Data, &agg); err != nil {
+			return err
+		}
+		// only process as AggregatedSleepAnalysis if first item parses to non-empty AggregatedSleepAnalysis
+		if len(agg) > 0 && *agg[0] != (AggregatedSleepAnalysis{}) {
+			m.AggregatedSleepAnalyses = agg
+			return nil
+		}
+		// if neither type of sleep analysis parsed something, parse as a Datapoint.
 		fallthrough
 	default:
 		if intermediate.Data == nil {
@@ -130,7 +154,11 @@ func (m *Metric) MarshalJSON() ([]byte, error) {
 			data = m.SleepAnalyses
 			break
 		}
-		// allow aggregated sleep analysis to be handled as a Datapoint
+		if len(m.AggregatedSleepAnalyses) > 0 {
+			data = m.AggregatedSleepAnalyses
+			break
+		}
+		// allow badly parsed sleep analysis to be handled as a Datapoint
 		fallthrough
 	default:
 		data = m.Datapoints

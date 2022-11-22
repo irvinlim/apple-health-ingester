@@ -141,31 +141,36 @@ func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, targetName st
 		points = append(points, point)
 	}
 
-	for _, sleepAnalysis := range metric.SleepAnalyses {
-		startFields := make(map[string]interface{})
-		endFields := make(map[string]interface{})
-
-		// Add qty if set
-		if sleepAnalysis.Qty != 0 {
-			endFields["qty"] = float64(sleepAnalysis.Qty)
-		}
-
-		// tags
-		tags["source"] = sleepAnalysis.Source
-		tags["value"] = sleepAnalysis.Value
-
-		// start point has state = 1 (on)
-		startFields["state"] = 1
-		startPoint := write.NewPoint(SleepAnalysisDetailed, tags, startFields, sleepAnalysis.StartDate.Time)
-		points = append(points, startPoint)
-
+	for _, s := range metric.SleepAnalyses {
+		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 1, nil, s.StartDate, targetName))
 		// end point has state = 0 (off)
-		endFields["state"] = 0
-		endPoint := write.NewPoint(SleepAnalysisDetailed, tags, endFields, sleepAnalysis.EndDate.Time)
-		points = append(points, endPoint)
+		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 0, &s.Qty, s.EndDate, targetName))
+	}
+
+	for _, a := range metric.AggregatedSleepAnalyses {
+		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 1, nil, a.SleepStart, targetName))
+		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 0, &a.Asleep, a.SleepEnd, targetName))
+		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 1, nil, a.InBedStart, targetName))
+		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 0, &a.InBed, a.InBedEnd, targetName))
 	}
 
 	return points
+}
+
+func makeSleepPoint(measurement string, source string, value string,
+	state uint8, qty *healthautoexport.Qty, t *healthautoexport.Time, target string) *write.Point {
+	point := write.NewPointWithMeasurement(measurement)
+	if target != "" {
+		point.AddTag("target_name", target)
+	}
+	point.AddTag("source", source)
+	point.AddTag("value", value)
+	if qty != nil {
+		point.AddField("qty", float64(*qty))
+	}
+	point.AddField("state", state)
+	point.SetTime(t.Time)
+	return point
 }
 
 func (b *Backend) writeWorkouts(workouts []*healthautoexport.Workout, targetName string) error {

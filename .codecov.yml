@@ -9,7 +9,7 @@ coverage:
         target: auto
 
         # Don't fail CI if it falls within a small threshold.
-        threshold: 2%
+        threshold: 10%
 
     patch:
       default:
