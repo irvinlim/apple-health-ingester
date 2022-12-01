@@ -46,7 +46,7 @@ var (
 				{
 					Name:  "sleep_analysis",
 					Units: "hr",
-					AggregateSleepAnalyses: []*healthautoexport.AggregateSleepAnalysis{
+					AggregatedSleepAnalyses: []*healthautoexport.AggregatedSleepAnalysis{
 						{
 							Asleep:      6.108333333333333,
 							SleepStart:  mktime("2021-12-18 02:21:06 +0800"),
