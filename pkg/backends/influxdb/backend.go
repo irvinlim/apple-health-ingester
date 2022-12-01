@@ -303,7 +303,9 @@ func (b *Backend) createRoutePoints(
 
 func addTagsToPoint(point *write.Point, tags []lp.Tag) {
 	for _, tag := range tags {
-		point.AddTag(tag.Key, tag.Value)
+		if tag.Value != "" {
+			point.AddTag(tag.Key, tag.Value)
+		}
 	}
 }
 
