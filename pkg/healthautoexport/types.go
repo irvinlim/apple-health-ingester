@@ -5,6 +5,7 @@ package healthautoexport
 import (
 	"encoding/json"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -95,7 +96,7 @@ type Workout struct {
 }
 
 // WorkoutFields is a map of generic QtyWithUnit fields in a Workout.
-type WorkoutFields map[string]*QtyWithUnit
+type WorkoutFields []Field
 
 // workoutCopy avoids reflection stack overflow by creating type alias of Workout.
 // https://stackoverflow.com/a/43178272/2037090
@@ -172,14 +173,9 @@ func (m *Metric) MarshalJSON() ([]byte, error) {
 }
 
 func (w *Workout) MarshalJSON() ([]byte, error) {
-	// Marshal and unmarshal Fields into a generic map
 	result := make(map[string]interface{})
-	bytes, err := jsoniter.Marshal(w.Fields)
-	if err != nil {
-		return nil, err
-	}
-	if err := jsoniter.Unmarshal(bytes, &result); err != nil {
-		return nil, err
+	for _, field := range w.Fields {
+		result[field.Key] = field.Value
 	}
 
 	// Marshal and unmarshal remaining fields onto the same map
@@ -210,7 +206,7 @@ func (w *Workout) UnmarshalJSON(bytes []byte) error {
 	}
 
 	// Use mapstructure to decode any matching field into Fields.
-	w.Fields = make(WorkoutFields)
+	w.Fields = make(WorkoutFields, 0, 10)
 	for k, value := range fields {
 		var result QtyWithUnit
 		dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -222,9 +218,15 @@ func (w *Workout) UnmarshalJSON(bytes []byte) error {
 			return err
 		}
 		if err := dec.Decode(value); err == nil {
-			w.Fields[k] = &result
+			w.Fields = append(w.Fields, Field{
+				Key:   k,
+				Value: &result,
+			})
 		}
 	}
+	sort.Slice(w.Fields, func(i, j int) bool {
+		return w.Fields[i].Key < w.Fields[j].Key
+	})
 
 	return nil
 }
@@ -234,6 +236,11 @@ type Qty float64
 
 // Units is used to define a unit of measurement.
 type Units string
+
+type Field struct {
+	Key   string
+	Value *QtyWithUnit
+}
 
 // QtyWithUnit combines a Qty with Units of measurement.
 type QtyWithUnit struct {
