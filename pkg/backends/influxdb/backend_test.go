@@ -16,10 +16,6 @@ import (
 	"github.com/irvinlim/apple-health-ingester/pkg/healthautoexport/fixtures"
 )
 
-const (
-	targetName = "test"
-)
-
 func TestBackend(t *testing.T) {
 	tests := []struct {
 		name         string
