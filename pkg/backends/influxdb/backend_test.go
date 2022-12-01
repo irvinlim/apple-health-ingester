@@ -23,12 +23,14 @@ const (
 func TestBackend(t *testing.T) {
 	tests := []struct {
 		name         string
+		target       string
 		payload      *healthautoexport.Payload
 		wantMetrics  []string
 		wantWorkouts []string
 	}{
 		{
-			name: "write active energy metrics",
+			name:   "write active energy metrics",
+			target: "test",
 			payload: &healthautoexport.Payload{
 				Data: &healthautoexport.PayloadData{
 					Metrics: []*healthautoexport.Metric{fixtures.MetricActiveEnergy},
@@ -39,7 +41,8 @@ func TestBackend(t *testing.T) {
 			},
 		},
 		{
-			name: "write empty metrics",
+			name:   "write empty metrics",
+			target: "test",
 			payload: &healthautoexport.Payload{
 				Data: &healthautoexport.PayloadData{
 					Metrics: []*healthautoexport.Metric{fixtures.MetricBasalBodyTemperatureNoData},
@@ -48,6 +51,7 @@ func TestBackend(t *testing.T) {
 		},
 		{
 			name:    "write aggregated sleep analysis metrics",
+			target:  "test",
 			payload: fixtures.PayloadMetricsSleepAnalysis,
 			wantMetrics: []string{
 				`sleep_analysis_aggregated,target_name=test,source=Irvin’s\ Apple\ Watch,value=asleep state=1u 1639765266000000000`,
@@ -58,6 +62,7 @@ func TestBackend(t *testing.T) {
 		},
 		{
 			name:    "write non aggregated sleep analysis metrics",
+			target:  "test",
 			payload: fixtures.PayloadMetricsSleepAnalysisNonAggregated,
 			wantMetrics: []string{
 				`sleep_analysis_detailed,target_name=test,source=Irvin's\ Apple\ Watch,value=Core state=1u 1639765266000000000`,
@@ -66,6 +71,7 @@ func TestBackend(t *testing.T) {
 		},
 		{
 			name:    "write workouts",
+			target:  "test",
 			payload: fixtures.PayloadWithWorkouts,
 			wantWorkouts: []string{
 				`workout,target_name=test,workout_name=Walking duration_min=19.166666666666668,elevation_ascent_m=16.36,elevation_descent_m=0,activeEnergy_kJ=226.21122641832523,stepCount_steps=908 1640304163000000000`,
@@ -76,13 +82,38 @@ func TestBackend(t *testing.T) {
 				`heart_rate_data_bpm,target_name=test,workout_name=Walking qty=108 1640304167000000000`,
 			},
 		},
+		{
+			name:   "write health metrics with no target",
+			target: "",
+			payload: &healthautoexport.Payload{
+				Data: &healthautoexport.PayloadData{
+					Metrics: []*healthautoexport.Metric{fixtures.MetricActiveEnergy},
+				},
+			}, wantMetrics: []string{
+				"active_energy_kJ, qty=0.7685677437484512 1640275440000000000",
+				"active_energy_kJ, qty=0.377848256251549 1640275500000000000",
+			},
+		},
+		{
+			name:    "write workouts with no target",
+			target:  "",
+			payload: fixtures.PayloadWithWorkouts,
+			wantWorkouts: []string{
+				`workout,workout_name=Walking duration_min=19.166666666666668,elevation_ascent_m=16.36,elevation_descent_m=0,activeEnergy_kJ=226.21122641832523,stepCount_steps=908 1640304163000000000`,
+				`route,workout_name=Walking lat=38.8951,lon=-77.0364,altitude=8.02762222290039 1640304285000000000`,
+				`heart_rate_data_bpm,workout_name=Walking qty=108 1640304167000000000`,
+				`workout,workout_name=Walking duration_min=19.166666666666668,elevation_ascent_m=16.36,elevation_descent_m=0,activeEnergy_kJ=226.21122641832523,stepCount_steps=908 1640304163000000000`,
+				`route,workout_name=Walking lat=38.8951,lon=-77.0364,altitude=8.02762222290039 1640304285000000000`,
+				`heart_rate_data_bpm,workout_name=Walking qty=108 1640304167000000000`,
+			},
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := NewBackendTest(t)
-			test.AssertWriteMetrics(t, tt.payload, tt.wantMetrics)
-			test.AssertWriteWorkouts(t, tt.payload, tt.wantWorkouts)
+			test.AssertWriteMetrics(t, tt.payload, tt.wantMetrics, tt.target)
+			test.AssertWriteWorkouts(t, tt.payload, tt.wantWorkouts, tt.target)
 			test.client.Reset()
 		})
 	}
@@ -102,13 +133,15 @@ func NewBackendTest(t *testing.T) *BackendTest {
 	return &BackendTest{backend: backend, client: client}
 }
 
-func (b *BackendTest) AssertWriteMetrics(t *testing.T, payload *healthautoexport.Payload, expected []string) {
-	assert.NoError(t, b.backend.Write(payload, targetName), "backend write error")
+func (b *BackendTest) AssertWriteMetrics(t *testing.T, payload *healthautoexport.Payload, expected []string,
+	target string) {
+	assert.NoError(t, b.backend.Write(payload, target), "backend write error")
 	b.assertPoints(t, expected, b.client.ReadMetrics())
 }
 
-func (b *BackendTest) AssertWriteWorkouts(t *testing.T, payload *healthautoexport.Payload, expected []string) {
-	assert.NoError(t, b.backend.Write(payload, targetName), "backend write error")
+func (b *BackendTest) AssertWriteWorkouts(t *testing.T, payload *healthautoexport.Payload, expected []string,
+	target string) {
+	assert.NoError(t, b.backend.Write(payload, target), "backend write error")
 	b.assertPoints(t, expected, b.client.ReadWorkouts())
 }
 
