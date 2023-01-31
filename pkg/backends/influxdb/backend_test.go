@@ -62,6 +62,7 @@ func TestBackend(t *testing.T) {
 			payload: fixtures.PayloadMetricsSleepPhases,
 			wantMetrics: []string{
 				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=awake qty=0.11666666666666667 1675125552000000000`,
+				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=asleep qty=0 1675125552000000000`,
 				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=inBed qty=8.145010935001903 1675125552000000000`,
 				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=core qty=3.2999999999999994 1675125552000000000`,
 				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=deep qty=0.8583333333333334 1675125552000000000`,

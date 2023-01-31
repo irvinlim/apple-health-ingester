@@ -166,6 +166,7 @@ func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, tags []lp.Tag
 		// All points for sleep phase will use the SleepEnd time.
 		if a.Source != "" {
 			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "awake", a.Awake, a.SleepEnd, tags))
+			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "asleep", a.Asleep, a.SleepEnd, tags))
 			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "inBed", a.InBed, a.SleepEnd, tags))
 			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "core", a.Core, a.SleepEnd, tags))
 			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "deep", a.Deep, a.SleepEnd, tags))

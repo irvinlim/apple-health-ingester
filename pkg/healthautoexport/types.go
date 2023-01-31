@@ -68,12 +68,12 @@ type AggregatedSleepAnalysis struct {
 	// End time of sleep.
 	SleepEnd *Time `json:"sleepEnd"`
 
-	// Asleep duration in hours.
-	// This will always be 0 and broken down into Core, Deep and REM from HAE v6.6.2 onwards.
-	Asleep Qty `json:"asleep"`
-
 	// InBed duration in hours.
 	InBed Qty `json:"inBed"`
+
+	// Asleep duration in hours.
+	// If the value is 0, then this duration is broken down into Core, Deep and REM from HAE v6.6.2 onwards.
+	Asleep Qty `json:"asleep"`
 
 	// Awake duration in hours.
 	// Only available from HAE v6.6.2 onwards.
