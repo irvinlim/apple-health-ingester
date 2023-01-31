@@ -262,6 +262,36 @@ func TestUnmarshalFromString(t *testing.T) {
 	}
 }`,
 		},
+		{
+			// Support new aggregated sleep_analysis format from HAE v6.6.2 onwards.
+			// https://github.com/irvinlim/apple-health-ingester/issues/20
+			name: "unmarshal aggregated sleep analysis",
+			want: fixtures.PayloadMetricsSleepPhases,
+			input: `{
+  "data": {
+    "metrics": [
+      {
+        "data": [
+          {
+            "inBed": 8.1450109350019027,
+            "deep": 0.85833333333333339,
+            "rem": 1.2583333333333333,
+            "sleepEnd": "2023-01-31 08:39:12 +0800",
+            "source": "Irvin's iPhone|Irvin’s Apple Watch",
+            "core": 3.2999999999999994,
+            "date": "2023-01-31 02:44:02 +0800",
+            "sleepStart": "2023-01-31 00:23:47 +0800",
+            "asleep": 0,
+            "awake": 0.11666666666666667
+          }
+        ],
+        "units": "hr",
+        "name": "sleep_analysis"
+      }
+    ]
+  }
+}`,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
