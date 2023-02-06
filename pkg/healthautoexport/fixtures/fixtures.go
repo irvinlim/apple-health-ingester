@@ -133,6 +133,30 @@ var (
 			},
 		},
 	}
+
+	PayloadMetricsSleepPhases = &healthautoexport.Payload{
+		Data: &healthautoexport.PayloadData{
+			Metrics: []*healthautoexport.Metric{
+				{
+					Name:  "sleep_analysis",
+					Units: "hr",
+					AggregatedSleepAnalyses: []*healthautoexport.AggregatedSleepAnalysis{
+						{
+							Asleep:     0,
+							SleepStart: mktime("2023-01-31 00:23:47 +0800"),
+							SleepEnd:   mktime("2023-01-31 08:39:12 +0800"),
+							Source:     "Irvin's iPhone|Irvin’s Apple Watch",
+							InBed:      8.1450109350019027,
+							Core:       3.2999999999999994,
+							Awake:      0.11666666666666667,
+							Deep:       0.85833333333333339,
+							REM:        1.2583333333333333,
+						},
+					},
+				},
+			},
+		},
+	}
 )
 
 func mktime(ts string) *healthautoexport.Time {

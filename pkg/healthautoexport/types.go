@@ -61,14 +61,55 @@ type SleepAnalysis struct {
 // It is only valid for aggregate sleep analysis data ("Aggregate Sleep Data" is enabled)
 type AggregatedSleepAnalysis struct {
 	// we don't parse "date" which doesn't seem to have useful interesting information
-	Asleep      Qty    `json:"asleep"`
-	SleepSource string `json:"sleepSource"`
-	SleepStart  *Time  `json:"sleepStart"`
-	SleepEnd    *Time  `json:"sleepEnd"`
-	InBed       Qty    `json:"inBed"`
-	InBedSource string `json:"inBedSource"`
-	InBedStart  *Time  `json:"inBedStart"`
-	InBedEnd    *Time  `json:"inBedEnd"`
+
+	// Start time of sleep.
+	SleepStart *Time `json:"sleepStart"`
+
+	// End time of sleep.
+	SleepEnd *Time `json:"sleepEnd"`
+
+	// InBed duration in hours.
+	InBed Qty `json:"inBed"`
+
+	// Asleep duration in hours.
+	Asleep Qty `json:"asleep"`
+
+	// Awake duration in hours.
+	// Only available from HAE v6.6.2 onwards.
+	Awake Qty `json:"awake,omitempty"`
+
+	// Core sleep duration in hours.
+	// Only available from HAE v6.6.2 onwards.
+	Core Qty `json:"core,omitempty"`
+
+	// Deep sleep duration in hours.
+	// Only available from HAE v6.6.2 onwards.
+	Deep Qty `json:"deep,omitempty"`
+
+	// REM sleep duration in hours.
+	// Only available from HAE v6.6.2 onwards.
+	REM Qty `json:"rem,omitempty"`
+
+	// Start time of inBed phase.
+	// Only available prior to HAE v6.6.2.
+	InBedStart *Time `json:"inBedStart,omitempty"`
+
+	// End time of inBed phase.
+	// Only available prior to HAE v6.6.2.
+	InBedEnd *Time `json:"inBedEnd,omitempty"`
+
+	// Data source of sleep data.
+	// Multiple source names will be joined together with a pipe (|).
+	// Only available from HAE v6.6.2 onwards.
+	Source string `json:"source,omitempty"`
+
+	// Data source of sleep phase.
+	// Only available prior to HAE v6.6.2.
+	SleepSource string `json:"sleepSource,omitempty"`
+
+	// Data source of inBed phase.
+	// Only available prior to HAE v6.6.2.
+	InBedSource string `json:"inBedSource,omitempty"`
 }
 
 func (m *Metric) GetUnits() Units {
@@ -111,25 +152,10 @@ func (m *Metric) UnmarshalJSON(bytes []byte) error {
 	}
 	switch m.Name {
 	case SleepAnalysisName:
-		var sa []*SleepAnalysis
-		if err := jsoniter.Unmarshal(intermediate.Data, &sa); err != nil {
-			return err
+		// Try to unmarshal as sleep_analysis on best-effort basis.
+		if m.unmarshalSleepAnalysis(intermediate.Data) {
+			break
 		}
-		// only process as SleepAnalysis if first item parses to non-empty SleepAnalysis
-		if len(sa) > 0 && *sa[0] != (SleepAnalysis{}) {
-			m.SleepAnalyses = sa
-			return nil
-		}
-		var agg []*AggregatedSleepAnalysis
-		if err := jsoniter.Unmarshal(intermediate.Data, &agg); err != nil {
-			return err
-		}
-		// only process as AggregatedSleepAnalysis if first item parses to non-empty AggregatedSleepAnalysis
-		if len(agg) > 0 && *agg[0] != (AggregatedSleepAnalysis{}) {
-			m.AggregatedSleepAnalyses = agg
-			return nil
-		}
-		// if neither type of sleep analysis parsed something, parse as a Datapoint.
 		fallthrough
 	default:
 		if intermediate.Data == nil {
@@ -140,8 +166,33 @@ func (m *Metric) UnmarshalJSON(bytes []byte) error {
 			return err
 		}
 		m.Datapoints = d
-		return nil
 	}
+
+	return nil
+}
+
+func (m *Metric) unmarshalSleepAnalysis(data []byte) bool {
+	// Try to unmarshal as SleepAnalysis first.
+	var sa []*SleepAnalysis
+	if err := jsoniter.Unmarshal(data, &sa); err == nil {
+		// Non-aggregated sleep_analysis should always have StartDate and EndDate set.
+		if len(sa) > 0 && !sa[0].StartDate.IsZero() && !sa[0].EndDate.IsZero() {
+			m.SleepAnalyses = sa
+			return true
+		}
+	}
+
+	// Try to unmarshal as AggregatedSleepAnalysis.
+	var agg []*AggregatedSleepAnalysis
+	if err := jsoniter.Unmarshal(data, &agg); err == nil {
+		// Aggregated sleep_analysis should always have SleepStart and SleepEnd set.
+		if len(agg) > 0 && !agg[0].SleepStart.IsZero() && !agg[0].SleepEnd.IsZero() {
+			m.AggregatedSleepAnalyses = agg
+			return true
+		}
+	}
+
+	return false
 }
 
 func (m *Metric) MarshalJSON() ([]byte, error) {

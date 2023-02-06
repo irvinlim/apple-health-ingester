@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	SleepAnalysisDetailed   = "sleep_analysis_detailed"
-	SleepAnalysisAggregated = "sleep_analysis_aggregated"
+	MeasurementSleepAnalysisDetailed   = "sleep_analysis_detailed"
+	MeasurementSleepAnalysisAggregated = "sleep_analysis_aggregated"
+	MeasurementSleepPhases             = "sleep_phases"
 )
 
 // Backend InfluxDB is used to store ingested metrics into InfluxDB. All metrics
@@ -142,17 +143,35 @@ func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, tags []lp.Tag
 		points = append(points, point)
 	}
 
+	// Add points for detailed sleep analysis.
 	for _, s := range metric.SleepAnalyses {
-		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 1, nil, s.StartDate, tags))
+		points = append(points, makeSleepPoint(MeasurementSleepAnalysisDetailed, s.Source, s.Value, 1, nil, s.StartDate, tags))
 		// end point has state = 0 (off)
-		points = append(points, makeSleepPoint(SleepAnalysisDetailed, s.Source, s.Value, 0, &s.Qty, s.EndDate, tags))
+		points = append(points, makeSleepPoint(MeasurementSleepAnalysisDetailed, s.Source, s.Value, 0, &s.Qty, s.EndDate, tags))
 	}
 
+	// Add points for aggregated sleep analysis.
 	for _, a := range metric.AggregatedSleepAnalyses {
-		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 1, nil, a.SleepStart, tags))
-		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.SleepSource, "asleep", 0, &a.Asleep, a.SleepEnd, tags))
-		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 1, nil, a.InBedStart, tags))
-		points = append(points, makeSleepPoint(SleepAnalysisAggregated, a.InBedSource, "inBed", 0, &a.InBed, a.InBedEnd, tags))
+		// Support old aggregated sleep analysis format prior to HAE v6.6.2.
+		if a.SleepSource != "" {
+			points = append(points, makeSleepPoint(MeasurementSleepAnalysisAggregated, a.SleepSource, "asleep", 1, nil, a.SleepStart, tags))
+			points = append(points, makeSleepPoint(MeasurementSleepAnalysisAggregated, a.SleepSource, "asleep", 0, &a.Asleep, a.SleepEnd, tags))
+		}
+		if a.InBedSource != "" {
+			points = append(points, makeSleepPoint(MeasurementSleepAnalysisAggregated, a.InBedSource, "inBed", 1, nil, a.InBedStart, tags))
+			points = append(points, makeSleepPoint(MeasurementSleepAnalysisAggregated, a.InBedSource, "inBed", 0, &a.InBed, a.InBedEnd, tags))
+		}
+
+		// Support sleep phase data from HAE v6.6.2 onwards.
+		// All points for sleep phase will use the SleepEnd time.
+		if a.Source != "" {
+			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "awake", a.Awake, a.SleepEnd, tags))
+			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "asleep", a.Asleep, a.SleepEnd, tags))
+			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "inBed", a.InBed, a.SleepEnd, tags))
+			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "core", a.Core, a.SleepEnd, tags))
+			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "deep", a.Deep, a.SleepEnd, tags))
+			points = append(points, makeSleepPhasePoint(MeasurementSleepPhases, a.Source, "rem", a.REM, a.SleepEnd, tags))
+		}
 	}
 
 	return points
@@ -168,6 +187,23 @@ func makeSleepPoint(measurement string, source string, value string,
 		point.AddField("qty", float64(*qty))
 	}
 	point.AddField("state", state)
+	point.SetTime(t.Time)
+	return point
+}
+
+func makeSleepPhasePoint(
+	measurement string,
+	source string,
+	value string,
+	qty healthautoexport.Qty,
+	t *healthautoexport.Time,
+	tags []lp.Tag,
+) *write.Point {
+	point := write.NewPointWithMeasurement(measurement)
+	addTagsToPoint(point, tags)
+	point.AddTag("source", source)
+	point.AddTag("value", value)
+	point.AddField("qty", float64(qty))
 	point.SetTime(t.Time)
 	return point
 }

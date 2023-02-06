@@ -57,6 +57,19 @@ func TestBackend(t *testing.T) {
 			},
 		},
 		{
+			name:    "write sleep phase metrics",
+			target:  "test",
+			payload: fixtures.PayloadMetricsSleepPhases,
+			wantMetrics: []string{
+				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=awake qty=0.11666666666666667 1675125552000000000`,
+				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=asleep qty=0 1675125552000000000`,
+				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=inBed qty=8.145010935001903 1675125552000000000`,
+				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=core qty=3.2999999999999994 1675125552000000000`,
+				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=deep qty=0.8583333333333334 1675125552000000000`,
+				`sleep_phases,target_name=test,source=Irvin's\ iPhone|Irvin’s\ Apple\ Watch,value=rem qty=1.2583333333333333 1675125552000000000`,
+			},
+		},
+		{
 			name:    "write non aggregated sleep analysis metrics",
 			target:  "test",
 			payload: fixtures.PayloadMetricsSleepAnalysisNonAggregated,
@@ -143,7 +156,7 @@ func (b *BackendTest) AssertWriteWorkouts(t *testing.T, payload *healthautoexpor
 
 func (b *BackendTest) assertPoints(t *testing.T, expectedLines []string, actual []*write.Point) {
 	if len(expectedLines) != len(actual) {
-		assert.Equal(t, len(expectedLines), len(actual), fmt.Sprintf("points are not equal length: %v vs %v", expectedLines, actual))
+		assert.Equal(t, len(expectedLines), len(actual), fmt.Sprintf("points are not equal length: %v vs %v", expectedLines, formatPoints(actual)))
 		return
 	}
 	for i := 0; i < len(expectedLines); i++ {
@@ -152,7 +165,19 @@ func (b *BackendTest) assertPoints(t *testing.T, expectedLines []string, actual 
 }
 
 func (b *BackendTest) assertPoint(t *testing.T, expectedLine string, actual *write.Point, msgAndArgs ...interface{}) {
-	actualLine := write.PointToLineProtocol(actual, time.Nanosecond)
-	actualLine = strings.TrimSuffix(actualLine, "\n")
+	actualLine := formatPoint(actual)
 	assert.Equalf(t, expectedLine, actualLine, "%v: diff = %v", fmt.Sprint(msgAndArgs...), cmp.Diff(expectedLine, actualLine))
+}
+
+func formatPoint(p *write.Point) string {
+	line := write.PointToLineProtocol(p, time.Nanosecond)
+	return strings.TrimSuffix(line, "\n")
+}
+
+func formatPoints(points []*write.Point) []string {
+	strs := make([]string, 0, len(points))
+	for _, point := range points {
+		strs = append(strs, formatPoint(point))
+	}
+	return strs
 }
