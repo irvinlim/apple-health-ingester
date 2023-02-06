@@ -72,7 +72,6 @@ type AggregatedSleepAnalysis struct {
 	InBed Qty `json:"inBed"`
 
 	// Asleep duration in hours.
-	// If the value is 0, then this duration is broken down into Core, Deep and REM from HAE v6.6.2 onwards.
 	Asleep Qty `json:"asleep"`
 
 	// Awake duration in hours.
@@ -174,7 +173,6 @@ func (m *Metric) UnmarshalJSON(bytes []byte) error {
 
 func (m *Metric) unmarshalSleepAnalysis(data []byte) bool {
 	// Try to unmarshal as SleepAnalysis first.
-	// However, it seems that later versions of Apple Health no longer expose this information.
 	var sa []*SleepAnalysis
 	if err := jsoniter.Unmarshal(data, &sa); err == nil {
 		// Non-aggregated sleep_analysis should always have StartDate and EndDate set.
