@@ -1,5 +1,6 @@
 # stage: 0
-FROM golang:1.17 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.17 AS builder
+ARG TARGETOS TARGETARCH
 
 WORKDIR /go/src/workspace
 
@@ -9,7 +10,7 @@ RUN go mod download
 
 # Add application code and install binary
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build \
     -a -v \
     -tags netgo \
