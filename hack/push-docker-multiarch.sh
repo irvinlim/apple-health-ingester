@@ -15,4 +15,6 @@ if [[ -n "${GIT_TAG}" ]]; then
   IMAGE_TAG_ARGS+=(--tag "${IMAGE_NAME}:${GIT_TAG}")
 fi
 
-docker build "${IMAGE_TAG_ARGS[@]}" --push .
+# create builder with multi-arch build support
+docker buildx create --use
+docker buildx build --platform 'linux/amd64,linux/arm64' "${IMAGE_TAG_ARGS[@]}" --push .
