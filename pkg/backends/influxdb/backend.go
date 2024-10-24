@@ -13,6 +13,7 @@ import (
 
 	"github.com/irvinlim/apple-health-ingester/pkg/backends"
 	"github.com/irvinlim/apple-health-ingester/pkg/healthautoexport"
+	utiltime "github.com/irvinlim/apple-health-ingester/pkg/util/time"
 )
 
 const (
@@ -59,7 +60,7 @@ func (b *Backend) Name() string {
 
 func (b *Backend) Write(payload *healthautoexport.Payload, targetName string) error {
 	// Properly handle nil data.
-	if payload.Data == nil {
+	if payload == nil || payload.Data == nil {
 		log.WithFields(log.Fields{
 			"backend": b.Name(),
 			"target":  targetName,
@@ -68,13 +69,17 @@ func (b *Backend) Write(payload *healthautoexport.Payload, targetName string) er
 	}
 
 	// Write metrics.
-	if err := b.writeMetrics(payload.Data.Metrics, targetName); err != nil {
-		return errors.Wrapf(err, "write metrics error")
+	if len(payload.Data.Metrics) > 0 {
+		if err := b.writeMetrics(payload.Data.Metrics, targetName); err != nil {
+			return errors.Wrapf(err, "write metrics error")
+		}
 	}
 
 	// Write workouts.
-	if err := b.writeWorkouts(payload.Data.Workouts, targetName); err != nil {
-		return errors.Wrapf(err, "write workouts error")
+	if len(payload.Data.Workouts) > 0 {
+		if err := b.writeWorkouts(payload.Data.Workouts, targetName); err != nil {
+			return errors.Wrapf(err, "write workouts error")
+		}
 	}
 
 	return nil
@@ -87,7 +92,6 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 		"num_metrics": len(metrics),
 	})
 
-	var count int
 	startTime := time.Now()
 	logger.Info("start writing all metrics")
 
@@ -96,32 +100,51 @@ func (b *Backend) writeMetrics(metrics []*healthautoexport.Metric, targetName st
 	}
 	tags = append(tags, b.staticTags...)
 
+	var info timeseriesInfo
 	for _, metric := range metrics {
-		points := b.getMetricPoints(metric, tags)
+		points, metricInfo := b.processMetricPoints(metric, tags)
 		if len(points) > 0 {
 			logger := logger.WithFields(log.Fields{
 				"metric_name": metric.Name,
 				"count":       len(points),
+				"time_range":  utiltime.FormatTimeRange(metricInfo.StartTime, metricInfo.EndTime, time.RFC3339),
 			})
 			startTime := time.Now()
-			count += len(points)
 			logger.Debug("writing metric points")
 			if err := b.client.WriteMetrics(b.ctx, points...); err != nil {
 				return errors.Wrapf(err, "write error for %v", metric.Name)
 			}
+
+			// Process info before moving on.
+			info.Count += metricInfo.Count
+			info.StartTime = utiltime.MinTimeNonZero(info.StartTime, metricInfo.StartTime)
+			info.EndTime = utiltime.MaxTime(info.EndTime, metricInfo.EndTime)
+
 			logger.WithField("elapsed", time.Since(startTime)).Debug("write metric points success")
 		}
 	}
 
 	logger.WithFields(log.Fields{
-		"points":  count,
-		"elapsed": time.Since(startTime),
+		"points":     info.Count,
+		"time_range": utiltime.FormatTimeRange(info.StartTime, info.EndTime, time.RFC3339),
+		"elapsed":    time.Since(startTime),
 	}).Info("write all metrics success")
 
 	return nil
 }
 
-func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, tags []lp.Tag) []*write.Point {
+type timeseriesInfo struct {
+	// Earliest timestamp that is collected.
+	StartTime time.Time `json:"start_time"`
+	// Latest timestamp that is collected.
+	EndTime time.Time `json:"end_time"`
+	// Total number of points.
+	Count int `json:"count"`
+}
+
+func (b *Backend) processMetricPoints(metric *healthautoexport.Metric, tags []lp.Tag) ([]*write.Point, timeseriesInfo) {
+	var info timeseriesInfo
+
 	points := make([]*write.Point, 0, len(metric.Datapoints))
 	datapointMeasurement := GetUnitizedMeasurementName(metric.Name, metric)
 	for _, datum := range metric.Datapoints {
@@ -140,6 +163,12 @@ func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, tags []lp.Tag
 			continue
 		}
 		point.SetTime(datum.Date.Time)
+
+		// Process info before moving on.
+		info.StartTime = utiltime.MinTimeNonZero(info.StartTime, datum.Date.Time)
+		info.EndTime = utiltime.MaxTime(info.EndTime, datum.Date.Time)
+		info.Count++
+
 		points = append(points, point)
 	}
 
@@ -174,7 +203,7 @@ func (b *Backend) getMetricPoints(metric *healthautoexport.Metric, tags []lp.Tag
 		}
 	}
 
-	return points
+	return points, info
 }
 
 func makeSleepPoint(measurement string, source string, value string,
