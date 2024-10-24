@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/google/go-cmp v0.5.6
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/influxdata/influxdb-client-go/v2 v2.6.0
 	github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839
 	github.com/json-iterator/go v1.1.12
@@ -19,6 +20,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deepmap/oapi-codegen v1.8.2 // indirect
 	github.com/go-logr/logr v1.2.0 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

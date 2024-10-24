@@ -2,7 +2,6 @@ package healthautoexport_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -310,10 +309,10 @@ func TestUnmarshalFromString(t *testing.T) {
 	}
 }
 
-func mktime(ts string) *healthautoexport.Time {
-	t, err := time.Parse(healthautoexport.TimeFormat, ts)
+func mktime(ts string) healthautoexport.Time {
+	t, err := healthautoexport.ParseTime(ts)
 	if err != nil {
 		panic(err)
 	}
-	return healthautoexport.NewTime(t)
+	return t
 }

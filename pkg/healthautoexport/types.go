@@ -4,19 +4,42 @@ package healthautoexport
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/mitchellh/mapstructure"
+	"github.com/pkg/errors"
 )
 
 const (
-	// TimeFormat is the format to parse time.Time in this package.
-	TimeFormat        = "2006-01-02 15:04:05 -0700"
 	SleepAnalysisName = "sleep_analysis"
+)
+
+var (
+	// TimeFormat is the default time format to use for output.
+	TimeFormat = TimeFormats[0]
+
+	// lastUsedTimeFormat is a global default time format for the package.
+	// Attempts to memoize the last used format to speed up unmarshaling.
+	// See ParseTime.
+	lastUsedTimeFormat = TimeFormat
+
+	// TimeFormats contains all known time formats to parse timestamp by.
+	TimeFormats = []string{
+		// Using 24-Hour Time
+		"2006-01-02 15:04:05 -0700",
+		// In case General > Date & Time > 24-Hour Time is set to false
+		"2006-01-02 3:04:05 PM -0700",
+		"2006-01-02 3:04:05 pm -0700",
+		// In case of newer iOS versions which introduce narrow non-breaking space characters into time format
+		"2006-01-02 3:04:05\xe2\x80\xafPM -0700",
+		"2006-01-02 3:04:05\xe2\x80\xafpm -0700",
+	}
 )
 
 type Payload struct {
@@ -415,12 +438,47 @@ type Time struct {
 	time.Time
 }
 
-func NewTime(t time.Time) *Time {
-	return &Time{Time: t}
+func NewTime(t time.Time) Time {
+	return Time{Time: t}
+}
+
+// ParseTime attempts to parses the input string in the time format expected by health auto export.
+//
+// Since iOS may export timestamps using different time formats depending on the Region setting,
+// we need to handle all possible time formats that may be available.
+//
+// As an optimization, the last known good format will be cached to speed up subsequent calls to ParseTime.
+func ParseTime(s string) (Time, error) {
+	var multiErr error
+	// Attempt to unmarshal using lastUsedTimeFormat first.
+	if t, err := parseTime(lastUsedTimeFormat, s); err == nil {
+		return t, nil
+	}
+	// Otherwise, try all formats.
+	for _, timeFormat := range TimeFormats {
+		parsed, err := parseTime(timeFormat, s)
+		if err != nil {
+			multiErr = multierror.Append(multiErr, err)
+			continue
+		}
+		// Cache the last used format to speed up subsequent parses.
+		lastUsedTimeFormat = timeFormat
+		return parsed, nil
+	}
+	return Time{}, fmt.Errorf(`failed to parse time "%v" across all known formats: %w`, s, multiErr)
+}
+
+// parseTime attempts to parse the time string with the given time format.
+func parseTime(timeFormat string, s string) (Time, error) {
+	parsed, err := time.Parse(timeFormat, s)
+	if err != nil {
+		return Time{}, errors.Wrapf(err, `cannot parse with format: "%v"`, timeFormat)
+	}
+	return NewTime(parsed), nil
 }
 
 // String returns a RFC3339 formatted timestamp string.
-func (t *Time) String() string {
+func (t Time) String() string {
 	return t.Format(time.RFC3339)
 }
 
@@ -455,7 +513,14 @@ func (t *Time) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return t.Time.UnmarshalJSON(data)
 	}
-	var err error
-	t.Time, err = time.Parse(`"`+TimeFormat+`"`, string(data))
-	return err
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	parsed, err := ParseTime(s)
+	if err != nil {
+		return err
+	}
+	t.Time = parsed.Time
+	return nil
 }
