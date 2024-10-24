@@ -25,13 +25,22 @@ func TestBackend(t *testing.T) {
 		wantWorkouts []string
 	}{
 		{
+			name:    "write nil payload",
+			payload: nil,
+		},
+		{
+			name:    "write nil payload data",
+			payload: &healthautoexport.Payload{Data: nil},
+		},
+		{
 			name:   "write active energy metrics",
 			target: "test",
 			payload: &healthautoexport.Payload{
 				Data: &healthautoexport.PayloadData{
 					Metrics: []*healthautoexport.Metric{fixtures.MetricActiveEnergy},
 				},
-			}, wantMetrics: []string{
+			},
+			wantMetrics: []string{
 				"active_energy_kJ,target_name=test qty=0.7685677437484512 1640275440000000000",
 				"active_energy_kJ,target_name=test qty=0.377848256251549 1640275500000000000",
 			},
@@ -43,7 +52,8 @@ func TestBackend(t *testing.T) {
 				Data: &healthautoexport.PayloadData{
 					Metrics: []*healthautoexport.Metric{fixtures.MetricBasalBodyTemperatureNoData},
 				},
-			}, wantMetrics: []string{},
+			},
+			wantMetrics: []string{},
 		},
 		{
 			name:    "write aggregated sleep analysis metrics",
