@@ -58,6 +58,16 @@ func TestParseTime(t *testing.T) {
 			input: "2024-09-21 7:57:00\xe2\x80\xafam +1000",
 			want:  healthautoexport.NewTime(mustParseTimeRFC3339("2024-09-21T07:57:00+10:00")),
 		},
+		{
+			name:  "12 hour time using capital AM/PM",
+			input: "2024-09-21 7:57:00 AM +1000",
+			want:  healthautoexport.NewTime(mustParseTimeRFC3339("2024-09-21T07:57:00+10:00")),
+		},
+		{
+			name:  "12 hour time using capital AM/PM with ICU 72.1 (E280AF)",
+			input: "2024-09-21 7:57:00\xe2\x80\xafAM +1000",
+			want:  healthautoexport.NewTime(mustParseTimeRFC3339("2024-09-21T07:57:00+10:00")),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

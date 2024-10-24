@@ -34,8 +34,10 @@ var (
 		// Using 24-Hour Time
 		"2006-01-02 15:04:05 -0700",
 		// In case General > Date & Time > 24-Hour Time is set to false
+		"2006-01-02 3:04:05 PM -0700",
 		"2006-01-02 3:04:05 pm -0700",
 		// In case of newer iOS versions which introduce narrow non-breaking space characters into time format
+		"2006-01-02 3:04:05\xe2\x80\xafPM -0700",
 		"2006-01-02 3:04:05\xe2\x80\xafpm -0700",
 	}
 )
