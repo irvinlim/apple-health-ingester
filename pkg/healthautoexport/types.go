@@ -24,13 +24,18 @@ var (
 	// TimeFormat is the default time format to use for output.
 	TimeFormat = TimeFormats[0]
 
+	// lastUsedTimeFormat is a global default time format for the package.
+	// Attempts to memoize the last used format to speed up unmarshaling.
+	// See ParseTime.
+	lastUsedTimeFormat = TimeFormat
+
 	// TimeFormats contains all known time formats to parse timestamp by.
 	TimeFormats = []string{
 		// Using 24-Hour Time
 		"2006-01-02 15:04:05 -0700",
 		// In case General > Date & Time > 24-Hour Time is set to false
 		"2006-01-02 3:04:05 pm -0700",
-		// In case of newer iOS versions which introduce non-breaking space characters into time format
+		// In case of newer iOS versions which introduce narrow non-breaking space characters into time format
 		"2006-01-02 3:04:05\xe2\x80\xafpm -0700",
 	}
 )
@@ -436,17 +441,38 @@ func NewTime(t time.Time) Time {
 }
 
 // ParseTime attempts to parses the input string in the time format expected by health auto export.
+//
+// Since iOS may export timestamps using different time formats depending on the Region setting,
+// we need to handle all possible time formats that may be available.
+//
+// As an optimization, the last known good format will be cached to speed up subsequent calls to ParseTime.
 func ParseTime(s string) (Time, error) {
 	var multiErr error
+	// Attempt to unmarshal using lastUsedTimeFormat first.
+	if t, err := parseTime(lastUsedTimeFormat, s); err == nil {
+		return t, nil
+	}
+	// Otherwise, try all formats.
 	for _, timeFormat := range TimeFormats {
-		parsed, err := time.Parse(timeFormat, s)
+		parsed, err := parseTime(timeFormat, s)
 		if err != nil {
-			multiErr = multierror.Append(multiErr, errors.Wrapf(err, `cannot parse with format: "%v"`, timeFormat))
+			multiErr = multierror.Append(multiErr, err)
 			continue
 		}
-		return NewTime(parsed), nil
+		// Cache the last used format to speed up subsequent parses.
+		lastUsedTimeFormat = timeFormat
+		return parsed, nil
 	}
-	return Time{}, fmt.Errorf(`failed to parse time across all known formats "%v": %w`, s, multiErr)
+	return Time{}, fmt.Errorf(`failed to parse time "%v" across all known formats: %w`, s, multiErr)
+}
+
+// parseTime attempts to parse the time string with the given time format.
+func parseTime(timeFormat string, s string) (Time, error) {
+	parsed, err := time.Parse(timeFormat, s)
+	if err != nil {
+		return Time{}, errors.Wrapf(err, `cannot parse with format: "%v"`, timeFormat)
+	}
+	return NewTime(parsed), nil
 }
 
 // String returns a RFC3339 formatted timestamp string.
@@ -491,7 +517,7 @@ func (t *Time) UnmarshalJSON(data []byte) error {
 	}
 	parsed, err := ParseTime(s)
 	if err != nil {
-		return errors.Wrapf(err, "cannot parse timestamp: %v", s)
+		return err
 	}
 	t.Time = parsed.Time
 	return nil
