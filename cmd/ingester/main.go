@@ -39,11 +39,9 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:         listenAddr,
-		Handler:      handler,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  15 * time.Second,
+		Addr:              listenAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			CurvePreferences: []tls.CurveID{

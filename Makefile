@@ -71,10 +71,10 @@ $(LOCALBIN): ## Ensure that the directory exists
 
 ## Tool Binaries
 GOIMPORTS ?= $(LOCALBIN)/goimports
-GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
+GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint@$(GOLANGCILINT_VERSION)
 
 ## Tool Versions
-GOLANGCILINT_VERSION ?= v1.50.1
+GOLANGCILINT_VERSION ?= v1.61.0
 
 .PHONY: goimports
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
@@ -86,4 +86,4 @@ GOLANGCILINT_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/golangci/golan
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT):
 	@[ -f $(GOLANGCI_LINT) ] || curl -sSfL $(GOLANGCILINT_INSTALL_SCRIPT) | sh -s $(GOLANGCILINT_VERSION)
-ROUPS=/tmp/code-generator/generate-groups.sh
+	mv $(LOCALBIN)/golangci-lint $(LOCALBIN)/golangci-lint@$(GOLANGCILINT_VERSION)

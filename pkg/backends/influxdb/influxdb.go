@@ -25,7 +25,7 @@ func NewInfluxDBClient() (influxdb2.Client, error) {
 
 	options := influxdb2.DefaultOptions().
 		SetTLSConfig(&tls.Config{
-			InsecureSkipVerify: insecureSkipVerify,
+			InsecureSkipVerify: insecureSkipVerify, // nolint:gosec
 		})
 
 	client := influxdb2.NewClientWithOptions(serverURL, authToken, options)
