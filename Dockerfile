@@ -1,5 +1,5 @@
 # stage: 0
-FROM golang:1.17 AS builder
+FROM golang:1.23 AS builder
 
 WORKDIR /go/src/workspace
 
@@ -9,8 +9,7 @@ RUN go mod download
 
 # Add application code and install binary
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build \
+RUN CGO_ENABLED=0 go build \
     -a -v \
     -tags netgo \
     -o build/ingester \
