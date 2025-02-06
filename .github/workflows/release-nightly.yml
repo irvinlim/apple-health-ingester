@@ -18,7 +18,7 @@ jobs:
   metadata:
     runs-on: ubuntu-latest
     outputs:
-      tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
+      git_hash: ${{ steps.git_hash.outputs.GIT_HASH }}
       go_version: ${{ steps.go_version.outputs.GO_VERSION }}
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +74,7 @@ jobs:
           if [[ ${{ inputs.use_git_hash_tag }} == 'true' ]]; then
             TAGS+=('${{ env.IMAGE }}:${{ needs.metadata.outputs.git_hash }}')
           fi
+          echo "Will push the following tags: $TAGS"
           IFS=,; echo "IMAGE_TAGS=${TAGS[*]}" >> $GITHUB_ENV
 
       - name: Build and push
