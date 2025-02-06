@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
     inputs:
       use_nightly_tag:
-        description: Whether to push to the nightly image tag.
+        description: Push "nightly" image tag
         default: true
         type: boolean
       use_git_hash_tag:
-        description: Whether to push to an image tag with the Git hash.
+        description: Push Git hash image tag
         default: false
         type: boolean
 
