@@ -12,7 +12,7 @@ jobs:
     outputs:
       go_version: ${{ steps.go_version.outputs.GO_VERSION }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Determine Go version from go.mod
@@ -24,7 +24,7 @@ jobs:
     needs: metadata
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Go
         uses: actions/setup-go@v3
@@ -42,7 +42,7 @@ jobs:
     needs: metadata
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Go
         uses: actions/setup-go@v3

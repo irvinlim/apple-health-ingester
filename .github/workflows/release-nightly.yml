@@ -12,7 +12,7 @@ jobs:
       tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
       go_version: ${{ steps.go_version.outputs.GO_VERSION }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Fetch all tags
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: metadata
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
