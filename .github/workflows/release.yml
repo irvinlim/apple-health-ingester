@@ -2,32 +2,56 @@ name: Release
 
 on:
   push:
+    branches: [ main ]
     tags:
       - '*'
+
+  # Allow manual run.
   workflow_dispatch:
+    inputs:
+      push_git_hash_tag:
+        description: Push Git hash image tag
+        default: false
+        type: boolean
 
 jobs:
   metadata:
     runs-on: ubuntu-latest
     outputs:
-      tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
       go_version: ${{ steps.go_version.outputs.GO_VERSION }}
+      image_tags: ${{ steps.image_tags.outputs.IMAGE_TAGS }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Fetch all tags
-        run: git fetch --force --tags
-      - name: Get the tag
-        id: tag_name
-        run: echo "TAG_NAME=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
       - name: Determine Go version from go.mod
         id: go_version
         run: echo "GO_VERSION=$(grep "go 1." go.mod | cut -d " " -f 2)" >> $GITHUB_OUTPUT
+      - name: Prepare image distribution name
+        run: echo "IMAGE=${{ secrets.DOCKER_HUB_USERNAME }}/apple-health-ingester" >> $GITHUB_ENV
+      - name: Prepare image tags
+        id: image_tags
+        run: |
+          TAGS=()
+          if [[ "${{ github.ref_type == 'tag' && github.ref_name != '' }}" == 'true' ]]; then
+            # Add Git tag and latest image tags, only on new tags.
+            TAGS+=('${{ env.IMAGE }}:${{ github.ref_name }}' '${{ env.IMAGE }}:latest')
+          elif [[ "${{ inputs.push_git_hash_tag }}" == 'true' ]]; then
+            # Push to image tag given by 12-character git hash.
+            HASH=$(echo "${{ github.ref_name }}" | cut -c1-12)
+            TAGS+=('${{ env.IMAGE }}:${HASH}')
+          elif [[ "${{ github.ref_name == 'main' }}" == 'true' ]]; then
+            # Otherwise push to nightly tag on main branch pushes.
+            TAGS+=('${{ env.IMAGE }}:nightly')
+          fi
+          echo "Will push the following tags: $TAGS"
+          IFS=,; echo "IMAGE_TAGS=${TAGS[*]}" >> $GITHUB_OUTPUT
 
+  # Build and push docker image.
   release-docker:
     runs-on: ubuntu-latest
     needs: metadata
+    if: needs.metadata.outputs.image_tags != ''
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,16 +78,14 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Prepare image distribution name
-        run: echo "IMAGE=${{ secrets.DOCKER_HUB_USERNAME }}/apple-health-ingester" >> $GITHUB_ENV
-
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ needs.metadata.outputs.tag_name }}
+          tags: ${{ needs.metadata.outputs.image_tags }}
 
+  # Release artifacts only on new tags.
   release-artifacts:
     strategy:
       matrix:
@@ -75,6 +97,7 @@ jobs:
 
     runs-on: ubuntu-latest
     needs: metadata
+    if: github.ref_type == 'tag'
     env:
       executable: apple-health-ingester-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
     steps:
@@ -99,7 +122,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: ${{env.executable}}
-          tag: ${{ needs.metadata.outputs.tag_name }}
+          artifacts: ${{ env.executable }}
+          tag: ${{ github.ref_name }}
           commit: main
           token: ${{ secrets.GITHUB_TOKEN }}
