@@ -68,10 +68,10 @@ jobs:
       - name: Make tags
         run: |
           TAGS=()
-          if [[ ${{ inputs.use_nightly_tag }} == 'true' ]]; then
+          if [[ "${{ inputs.use_nightly_tag }}" == 'true' ]]; then
             TAGS+=('${{ env.IMAGE }}:nightly')
           fi
-          if [[ ${{ inputs.use_git_hash_tag }} == 'true' ]]; then
+          if [[ "${{ inputs.use_git_hash_tag }}" == 'true' ]]; then
             TAGS+=('${{ env.IMAGE }}:${{ needs.metadata.outputs.git_hash }}')
           fi
           echo "Will push the following tags: $TAGS"
