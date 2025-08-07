@@ -20,6 +20,8 @@ const (
 	MeasurementSleepAnalysisDetailed   = "sleep_analysis_detailed"
 	MeasurementSleepAnalysisAggregated = "sleep_analysis_aggregated"
 	MeasurementSleepPhases             = "sleep_phases"
+	MeasurementStateOfMind             = "state_of_mind"
+	MeasurementSymptom                 = "symptom"
 )
 
 // Backend InfluxDB is used to store ingested metrics into InfluxDB. All metrics
@@ -79,6 +81,18 @@ func (b *Backend) Write(payload *healthautoexport.Payload, targetName string) er
 	if len(payload.Data.Workouts) > 0 {
 		if err := b.writeWorkouts(payload.Data.Workouts, targetName); err != nil {
 			return errors.Wrapf(err, "write workouts error")
+		}
+	}
+
+	if len(payload.Data.StateOfMind) > 0 {
+		if err := b.writeStateOfMind(payload.Data.StateOfMind, targetName); err != nil {
+			return errors.Wrapf(err, "write state of mind error")
+		}
+	}
+
+	if len(payload.Data.Symptoms) > 0 {
+		if err := b.writeSymptoms(payload.Data.Symptoms, targetName); err != nil {
+			return errors.Wrapf(err, "write symptoms error")
 		}
 	}
 
@@ -234,6 +248,138 @@ func makeSleepPhasePoint(
 	point.AddTag("value", value)
 	point.AddField("qty", float64(qty))
 	point.SetTime(t.Time)
+	return point
+}
+
+func (b *Backend) writeStateOfMind(states []*healthautoexport.StateOfMind, targetName string) error {
+	logger := log.WithFields(log.Fields{
+		"backend":    b.Name(),
+		"target":     targetName,
+		"num_states": len(states),
+	})
+
+	startTime := time.Now()
+	logger.Info("start writing all state of mind entries")
+
+	tags := []lp.Tag{
+		{Key: "target_name", Value: targetName},
+	}
+	tags = append(tags, b.staticTags...)
+
+	points := make([]*write.Point, 0, len(states))
+	for _, state := range states {
+		point := b.createStateOfMindPoint(state, tags)
+		if point != nil {
+			points = append(points, point)
+		}
+	}
+
+	if len(points) > 0 {
+		logger := logger.WithFields(log.Fields{
+			"count": len(points),
+		})
+		startTime := time.Now()
+		logger.Debug("writing state of mind points")
+		if err := b.client.WriteMetrics(b.ctx, points...); err != nil {
+			return errors.Wrapf(err, "write error for state of mind")
+		}
+		logger.WithField("elapsed", time.Since(startTime)).Debug("write state of mind points success")
+	}
+
+	logger.WithFields(log.Fields{
+		"points":  len(points),
+		"elapsed": time.Since(startTime),
+	}).Info("write all state of mind entries success")
+
+	return nil
+}
+
+func (b *Backend) createStateOfMindPoint(state *healthautoexport.StateOfMind, tags []lp.Tag) *write.Point {
+	if state.Start.IsZero() {
+		return nil
+	}
+	point := write.NewPointWithMeasurement(MeasurementStateOfMind)
+	addTagsToPoint(point, tags)
+
+	point.AddTag("kind", state.Kind)
+	if len(state.Labels) > 0 {
+		point.AddTag("labels", strings.Join(state.Labels, ","))
+	}
+	if len(state.Associations) > 0 {
+		point.AddTag("associations", strings.Join(state.Associations, ","))
+	}
+
+	point.AddField("valence", state.Valence)
+	point.AddTag("valence_classification", state.ValenceClassification)
+	point.AddField("duration", state.End.Sub(state.Start.Time).Seconds())
+
+	for k, v := range state.Metadata {
+		point.AddField(fmt.Sprintf("metadata_%s", k), v)
+	}
+
+	point.SetTime(state.Start.Time)
+	return point
+}
+
+func (b *Backend) writeSymptoms(symptoms []*healthautoexport.Symptom, targetName string) error {
+	logger := log.WithFields(log.Fields{
+		"backend":      b.Name(),
+		"target":       targetName,
+		"num_symptoms": len(symptoms),
+	})
+
+	startTime := time.Now()
+	logger.Info("start writing all symptoms")
+
+	tags := []lp.Tag{
+		{Key: "target_name", Value: targetName},
+	}
+	tags = append(tags, b.staticTags...)
+
+	points := make([]*write.Point, 0, len(symptoms))
+	for _, symptom := range symptoms {
+		point := b.createSymptomPoint(symptom, tags)
+		if point != nil {
+			points = append(points, point)
+		}
+	}
+
+	if len(points) > 0 {
+		logger := logger.WithFields(log.Fields{
+			"count": len(points),
+		})
+		startTime := time.Now()
+		logger.Debug("writing symptom points")
+		if err := b.client.WriteMetrics(b.ctx, points...); err != nil {
+			return errors.Wrapf(err, "write error for symptoms")
+		}
+		logger.WithField("elapsed", time.Since(startTime)).Debug("write symptom points success")
+	}
+
+	logger.WithFields(log.Fields{
+		"points":  len(points),
+		"elapsed": time.Since(startTime),
+	}).Info("write all symptoms success")
+
+	return nil
+}
+
+func (b *Backend) createSymptomPoint(symptom *healthautoexport.Symptom, tags []lp.Tag) *write.Point {
+	if symptom.Start.IsZero() {
+		return nil
+	}
+	point := write.NewPointWithMeasurement(MeasurementSymptom)
+	addTagsToPoint(point, tags)
+
+	point.AddTag("name", symptom.Name)
+	point.AddTag("severity", symptom.Severity)
+	point.AddTag("source", symptom.Source)
+
+	point.AddField("user_entered", symptom.UserEntered)
+	point.AddField("duration", symptom.End.Sub(symptom.Start.Time).Seconds())
+	point.AddField("cycle_start", symptom.CycleStart)
+
+	point.SetTime(symptom.Start.Time)
 	return point
 }
 
