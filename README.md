@@ -65,7 +65,17 @@ $ docker run --rm irvinlim/apple-health-ingester --help
 
 ## Configuration
 
-### Command-line Flags
+### Specifying Configuration 
+
+We use [spf13/viper](https://github.com/spf13/viper) for configuration, and therefore configuration can be specified in the following places, in order of precedence from highest to lowest:
+
+- Command-line flags
+- Environment variables
+- Config file
+
+See the following sections for available configuration keys for each of the available configuration methods.
+
+#### Command-line Flags
 
 ```sh
 $ ./build/ingester --help
@@ -87,6 +97,12 @@ Usage of ./build/ingester:
       --localfile.metricsPath string         Output path to write metrics, with one metric per file. All data will be aggregated by timestamp. Any existing data will be merged together.
       --log string                           Log level to use. (default "info")
 ```
+
+#### Environment Variables
+
+Any environment variables 
+
+#### Config Files
 
 ### Global Configuration
 

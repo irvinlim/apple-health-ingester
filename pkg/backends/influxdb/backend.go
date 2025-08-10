@@ -2,8 +2,6 @@ package influxdb
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
@@ -11,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	configv1 "github.com/irvinlim/apple-health-ingester/apis/config/v1"
 	"github.com/irvinlim/apple-health-ingester/pkg/backends"
 	"github.com/irvinlim/apple-health-ingester/pkg/healthautoexport"
 	utiltime "github.com/irvinlim/apple-health-ingester/pkg/util/time"
@@ -32,23 +31,23 @@ type Backend struct {
 
 var _ backends.Backend = &Backend{}
 
-func NewBackend(client Client) (backends.Backend, error) {
+func NewBackend(cfg *configv1.InfluxdbBackendConfig, client Client) (backends.Backend, error) {
+	if cfg == nil {
+		cfg = &configv1.InfluxdbBackendConfig{}
+	}
+
 	backend := &Backend{
 		ctx:        context.TODO(),
 		client:     client,
-		staticTags: make([]lp.Tag, len(staticTags)),
+		staticTags: make([]lp.Tag, 0, len(cfg.StaticTags)),
 	}
 
 	// Prepare static tags.
-	for i, tag := range staticTags {
-		tokens := strings.SplitN(tag, "=", 2)
-		if len(tokens) != 2 {
-			return nil, fmt.Errorf("invalid static tag %v", tag)
-		}
-		backend.staticTags[i] = lp.Tag{
-			Key:   tokens[0],
-			Value: tokens[1],
-		}
+	for key, val := range cfg.StaticTags {
+		backend.staticTags = append(backend.staticTags, lp.Tag{
+			Key:   key,
+			Value: val,
+		})
 	}
 
 	return backend, nil

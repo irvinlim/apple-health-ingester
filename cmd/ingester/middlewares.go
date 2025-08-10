@@ -8,6 +8,8 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	configv1 "github.com/irvinlim/apple-health-ingester/apis/config/v1"
 )
 
 const (
@@ -56,7 +58,7 @@ func createLoggingHandler(logger *log.Logger) func(http.Handler) http.Handler {
 
 // createAuthenticateHandler returns a middleware that will authenticate
 // incoming http requests.
-func createAuthenticateHandler() func(http.Handler) http.Handler {
+func createAuthenticateHandler(cfg *configv1.Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		unauthorized := func(w http.ResponseWriter) {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -64,7 +66,7 @@ func createAuthenticateHandler() func(http.Handler) http.Handler {
 		}
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if authorizationToken != "" {
+			if cfg.HttpServer.Auth.AuthorizationToken != "" {
 				header := r.Header.Get("Authorization")
 
 				if !strings.HasPrefix(header, bearerPrefix) {
@@ -73,7 +75,7 @@ func createAuthenticateHandler() func(http.Handler) http.Handler {
 				}
 
 				token := header[len(bearerPrefix):]
-				if token != authorizationToken {
+				if token != cfg.HttpServer.Auth.AuthorizationToken {
 					unauthorized(w)
 					return
 				}
