@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -55,9 +56,30 @@ func main() {
 	}
 
 	if log.IsLevelEnabled(log.DebugLevel) {
+		cfg := cfg.DeepCopy()
+
+		// Redact certain fields.
+		if cfg.HttpServer.Auth.AuthorizationToken != "" {
+			cfg.HttpServer.Auth.AuthorizationToken = "REDACTED"
+		}
+		if len(cfg.HttpServer.TLS.CertData) > 0 {
+			cfg.HttpServer.TLS.CertData = "DATA+OMITTED"
+		}
+		if len(cfg.HttpServer.TLS.KeyData) > 0 {
+			cfg.HttpServer.TLS.KeyData = "DATA+OMITTED"
+		}
+		if cfg.Backends.InfluxDB.AuthToken != "" {
+			cfg.Backends.InfluxDB.AuthToken = "REDACTED"
+		}
+
 		if out, err := yaml.Marshal(cfg); err == nil {
 			logutils.QuotesDisabled().WithField("config", "\n"+string(out)).Info("successfully loaded validated config")
 		}
+	}
+
+	// Validate the configuration at this stage.
+	if err := config.Validate(cfg); err != nil {
+		log.WithError(err).Fatal("invalid config, see --help")
 	}
 
 	// Add middlewares
@@ -81,6 +103,27 @@ func main() {
 				tls.X25519,
 			},
 		},
+	}
+
+	// Set up TLS.
+	if tlsCfg := cfg.HttpServer.TLS; tlsCfg.Enabled {
+		certData := strings.TrimSpace(tlsCfg.CertData)
+		keyData := strings.TrimSpace(tlsCfg.KeyData)
+		if len(certData) > 0 && len(keyData) > 0 {
+			cert, err := tls.X509KeyPair([]byte(certData), []byte(keyData))
+			if err != nil {
+				log.Fatalf("failed to load server certificate and key: %v", err)
+			}
+			server.TLSConfig.Certificates = []tls.Certificate{cert}
+		} else if tlsCfg.CertFile != "" && tlsCfg.KeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(tlsCfg.CertFile, tlsCfg.KeyFile)
+			if err != nil {
+				log.Fatalf("failed to load server certificate and key: %v", err)
+			}
+			server.TLSConfig.Certificates = []tls.Certificate{cert}
+		} else {
+			log.Fatalf("TLS cert and key are required, see --help")
+		}
 	}
 
 	// Initialize and register backends for ingester
@@ -108,7 +151,8 @@ func main() {
 		log.WithField("listen_addr", cfg.HttpServer.ListenAddr).Info("starting http server")
 		var err error
 		if cfg.HttpServer.TLS.Enabled {
-			err = server.ListenAndServeTLS(cfg.HttpServer.TLS.CertFile, cfg.HttpServer.TLS.KeyFile)
+			// Use the cert and key from the TLSConfig.
+			err = server.ListenAndServeTLS("", "")
 		} else {
 			err = server.ListenAndServe()
 		}

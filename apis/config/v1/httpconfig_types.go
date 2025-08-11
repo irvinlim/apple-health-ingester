@@ -23,12 +23,12 @@ type HttpTLSConfig struct {
 	CertFile string `json:"certFile,omitempty" env:"TLS_CERT_FILE"`
 	// The TLS certificate data to serve.
 	// At most one of CertFile or CertData can be specified.
-	CertData []byte `json:"certificateData,omitempty"`
+	CertData string `json:"certData,omitempty"`
 	// The path to the TLS private key.
 	KeyFile string `json:"keyFile,omitempty" env:"TLS_KEY_FILE"`
 	// The TLS private key.
 	// At most one of KeyFile or KeyData can be specified.
-	KeyData []byte `json:"keyData,omitempty"`
+	KeyData string `json:"keyData,omitempty"`
 }
 
 type HttpAuthConfig struct {

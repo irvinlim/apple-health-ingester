@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	configv1 "github.com/irvinlim/apple-health-ingester/apis/config/v1"
@@ -269,12 +268,6 @@ func LoadConfigAndMergeFlags(flags *Flags, args config.LoadConfigArgs) (*configv
 	cfg = cfg.DeepCopy()
 	if err := flags.Merge(cfg); err != nil {
 		return nil, errors.Wrapf(err, "cannot merge flags with command-line arguments")
-	}
-
-	// Now validate the config since everything is populated.
-	if err := config.Validate(cfg); err != nil {
-		log.WithError(err).Error("invalid config, see --help")
-		return nil, errors.Wrapf(err, "invalid config")
 	}
 
 	return cfg, nil

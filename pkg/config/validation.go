@@ -63,7 +63,7 @@ func (v *Validator) validateHttpTLSConfig(fldPath *field.Path, cfg configv1.Http
 	if certSpecified == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify either certFile or certData"))
 	} else if certSpecified > 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath, cfg, "exactly one or certFile or certData must be specified"))
+		allErrs = append(allErrs, field.Invalid(fldPath, cfg.CertFile, "exactly one or certFile or certData must be specified"))
 	}
 
 	// Exactly one of keyFile / keyData must be specified.
@@ -77,7 +77,7 @@ func (v *Validator) validateHttpTLSConfig(fldPath *field.Path, cfg configv1.Http
 	if keySpecified == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify either keyFile or keyData"))
 	} else if keySpecified > 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath, cfg, "exactly one or keyFile or keyData must be specified"))
+		allErrs = append(allErrs, field.Invalid(fldPath, cfg.KeyFile, "exactly one or keyFile or keyData must be specified"))
 	}
 
 	return allErrs

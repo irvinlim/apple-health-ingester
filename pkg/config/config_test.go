@@ -89,7 +89,7 @@ httpServer:
 			wantErr: testutils.AssertErrorContains("found unexpected end of stream"),
 		},
 		{
-			name: "successfully load from config file",
+			name: "successfully load YAML from config file",
 			files: map[string]string{
 				"/config.yaml": `
 httpServer:
@@ -98,6 +98,20 @@ httpServer:
 			},
 			args: LoadConfigArgs{
 				ConfigFilePath: "/config.yaml",
+			},
+			want: &configv1.Config{
+				HttpServer: configv1.HttpServerConfig{
+					ListenAddr: ":5050",
+				},
+			},
+		},
+		{
+			name: "successfully load JSON from config file",
+			files: map[string]string{
+				"/config.json": `{"httpServer":{"listenAddr":":5050"}}`,
+			},
+			args: LoadConfigArgs{
+				ConfigFilePath: "/config.json",
 			},
 			want: &configv1.Config{
 				HttpServer: configv1.HttpServerConfig{
