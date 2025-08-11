@@ -9,14 +9,10 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
 
+	configv1 "github.com/irvinlim/apple-health-ingester/apis/config/v1"
 	"github.com/irvinlim/apple-health-ingester/pkg/backends"
 	"github.com/irvinlim/apple-health-ingester/pkg/healthautoexport"
-)
-
-var (
-	metricsPath string
 )
 
 // Backend LocalFile is used to store ingested metrics in the local filesystem
@@ -26,22 +22,25 @@ var (
 //
 // TODO(irvinlim): Handle workout data
 type Backend struct {
+	cfg     *configv1.LocalFileBackendConfig
 	metrics map[string]*MetricFile
 	mtx     sync.RWMutex
 }
 
 var _ backends.Backend = &Backend{}
 
-func NewBackend() (*Backend, error) {
-	backend := &Backend{}
+func NewBackend(cfg *configv1.LocalFileBackendConfig) (*Backend, error) {
+	backend := &Backend{
+		cfg: cfg,
+	}
 
 	// Load metrics
-	if metricsPath == "" {
+	if cfg.MetricsPath == "" {
 		return nil, errors.New("--localfile.metricsPath is not set")
 	}
 	metrics, err := backend.loadMetrics()
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot load metrics from %v", metricsPath)
+		return nil, errors.Wrapf(err, "cannot load metrics from %v", cfg.MetricsPath)
 	}
 	backend.metrics = metrics
 
@@ -103,7 +102,7 @@ func (b *Backend) handleMetric(metric *healthautoexport.Metric, target string) e
 	metricFile.Data = updatedData
 
 	// Write back
-	metricFilePath := path.Join(metricsPath, fileName)
+	metricFilePath := path.Join(b.cfg.MetricsPath, fileName)
 	if err := b.writeMetricFile(metricFilePath, &metricFile); err != nil {
 		return errors.Wrapf(err, "cannot write metrics to %v", metricFilePath)
 	}
@@ -113,7 +112,7 @@ func (b *Backend) handleMetric(metric *healthautoexport.Metric, target string) e
 
 func (b *Backend) loadMetrics() (map[string]*MetricFile, error) {
 	output := make(map[string]*MetricFile)
-	files, err := os.ReadDir(metricsPath)
+	files, err := os.ReadDir(b.cfg.MetricsPath)
 	if err != nil {
 		// Directory doesn't exist, simply return empty map.
 		if os.IsNotExist(err) {
@@ -124,7 +123,7 @@ func (b *Backend) loadMetrics() (map[string]*MetricFile, error) {
 	}
 
 	for _, file := range files {
-		metricFilePath := path.Join(metricsPath, file.Name())
+		metricFilePath := path.Join(b.cfg.MetricsPath, file.Name())
 		metricFile, err := b.loadMetricFile(metricFilePath)
 		if err != nil {
 			log.WithError(err).Warnf("could not read %v as metric file", metricFilePath)
@@ -174,10 +173,4 @@ func (b *Backend) writeMetricFile(name string, metricFile *MetricFile) error {
 	enc := jsoniter.NewEncoder(file)
 	enc.SetIndent("", "  ")
 	return enc.Encode(metricFile)
-}
-
-func init() {
-	pflag.StringVar(&metricsPath, "localfile.metricsPath", "",
-		"Output path to write metrics, with one metric per file. All data will be aggregated by timestamp. "+
-			"Any existing data will be merged together.")
 }

@@ -8,6 +8,9 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# Set license header files.
+LICENSE_HEADER_GO ?= hack/boilerplate.go.txt
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -56,6 +59,12 @@ tidy: ## Run go mod tidy.
 test: ## Run tests with coverage. Outputs to combined.cov.
 	go test -v -coverprofile=coverage.txt -covermode=count ./...
 
+.PHONY: generate
+generate: generate-deepcopy fmt ## Generate Go code.
+
+generate-deepcopy: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	$(CONTROLLER_GEN) object:headerFile="$(LICENSE_HEADER_GO)" paths="./..."
+
 ##@ Building
 
 .PHONY: build
@@ -72,9 +81,11 @@ $(LOCALBIN): ## Ensure that the directory exists
 ## Tool Binaries
 GOIMPORTS ?= $(LOCALBIN)/goimports
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint@$(GOLANGCILINT_VERSION)
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
 ## Tool Versions
 GOLANGCILINT_VERSION ?= v1.61.0
+CONTROLLER_TOOLS_VERSION ?= v0.16.1
 
 .PHONY: goimports
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
@@ -87,3 +98,9 @@ golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT):
 	@[ -f $(GOLANGCI_LINT) ] || curl -sSfL $(GOLANGCILINT_INSTALL_SCRIPT) | sh -s $(GOLANGCILINT_VERSION)
 	mv $(LOCALBIN)/golangci-lint $(LOCALBIN)/golangci-lint@$(GOLANGCILINT_VERSION)
+
+.PHONY: controller-gen
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
+$(CONTROLLER_GEN):
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+	mv $(LOCALBIN)/controller-gen $(LOCALBIN)/controller-gen@$(CONTROLLER_TOOLS_VERSION)

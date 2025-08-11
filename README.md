@@ -43,7 +43,7 @@ For more detailed instructions, refer to the [official site](https://www.healthy
 
 ### Running the Server
 
-You can deploy and run the server using Docker or as a standalone binary, which is packaged and released on the .
+You can deploy and run the server using Docker or as a standalone binary, which is packaged and released on the [GitHub Releases page](https://github.com/irvinlim/apple-health-ingester/releases).
 
 ### Linux Download
 
@@ -65,48 +65,99 @@ $ docker run --rm irvinlim/apple-health-ingester --help
 
 ## Configuration
 
-### Command-line Flags
+### Specifying Configuration 
+
+Configuration can be specified in the following places, in order of precedence from lowest to highest:
+
+- Config file (**preferred**)
+- Environment variables
+- Command-line flags
+
+See the following sections for available configuration keys for each of the available configuration methods. 
+
+#### Configuration File
+
+The preferred method of configuration is via configuration files. An example configuration file to get started is as follows:
+
+```sh
+httpServer:
+  listenAddr: ":8080"
+backends:
+  influxdb:
+    enabled: true
+    serverURL: "<YOUR INFLUXDB URL>"
+    orgName: "<YOUR ORG NAME>"
+    bucketNames:
+      metrics: "apple_health_metrics"
+      workouts: "apple_health_workouts"
+```
+
+Configuration files can be specified in both JSON and YAML format. To pass the configuration to the application, use the `--config` or `-c` command-line flag such as follows:
+
+```sh
+./build/ingester -c config.yaml
+```
+
+If any of the following configuration paths exist, the config file will be automatically discovered and loaded, listed below in order of preference:
+
+- `./config.yaml`
+- `./config.json`
+- `/config.yaml`
+- `/config.json`
+
+#### Environment Variables
+
+Environment variables take greater precedence over those specified via configuration files. These can be used to override behaviour at runtime if necessary.
+
+Not all configuration fields will be exposed via environment variables, and therefore it is recommended to only make use of environment variables sparingly.
+
+#### Command-line Flags
+
+Finally, command-line flags take highest precedence over all other configuration methods available. Similar to environment variables, not all configuration can be configured via command-line flags, and therefore it is recommended to define complex configuration in a config file instead.
+
+Since command-line flags were introduced since the beginning, support for existing command-line flags will _not_ be dropped to maintain backwards compatibility.
+
+The following command-line flags are currently available:
 
 ```sh
 $ ./build/ingester --help
 Usage of ./build/ingester:
       --backend.influxdb                     Enable the InfluxDB storage backend.
       --backend.localfile                    Enable the LocalFile storage backend.
+  -c, --config string                        Path to YAML or JSON configuration file.
+                                             However, config specified via environment variables or command-line arguments will still take greater precedence.
+                                             If not specified, attempts to discover configuration files at the following locations in order:
+                                               config.yaml, config.json, /config/config.yaml, /config/config.json
       --http.authToken string                Optional authorization token that will be used to authenticate incoming requests.
+                                             Environment variable: $AUTH_TOKEN
       --http.certFile string                 Certificate file for TLS support.
+                                             Environment variable: $TLS_CERT_FILE
       --http.enableTLS                       Enable TLS/HTTPS. Requires setting certificate and key files.
+                                             Environment variable: $TLS_ENABLED
       --http.keyFile string                  Key file for TLS support.
-      --http.listenAddr string               Address to listen on. (default ":8080")
+                                             Environment variable: $TLS_KEY_FILE
+      --http.listenAddr string               Address to listen on.
+                                             Environment variable: $LISTEN_ADDR
       --influxdb.authToken string            Auth token to connect to InfluxDB.
+                                             Environment variable: $INFLUXDB_AUTH_TOKEN
       --influxdb.insecureSkipVerify          Skip TLS verification of the certificate chain and host name for the InfluxDB server.
+                                             Environment variable: $INFLUXDB_INSECURE_SKIP_VERIFY
       --influxdb.metricsBucketName string    InfluxDB bucket name for metrics.
+                                             Environment variable: $INFLUXDB_METRICS_BUCKET
       --influxdb.orgName string              InfluxDB organization name.
+                                             Environment variable: $INFLUXDB_ORG_NAME
       --influxdb.serverURL string            Server URL for InfluxDB.
+                                             Environment variable: $INFLUXDB_SERVER_URL
       --influxdb.staticTags strings          Additional tags to add to InfluxDB for every single request, in key=value format.
       --influxdb.workoutsBucketName string   InfluxDB bucket name for workouts.
+                                             Environment variable: $INFLUXDB_WORKOUTS_BUCKET
       --localfile.metricsPath string         Output path to write metrics, with one metric per file. All data will be aggregated by timestamp. Any existing data will be merged together.
       --log string                           Log level to use. (default "info")
 ```
 
-### Global Configuration
+### Configuration Fields
 
-#### `http.listenAddr`
-
-Address to listen on, in `IP:port` format. Defaults to `:8080`.
-
-#### `http.authToken`
-
-Optional authorization token that will be used to authenticate incoming requests. The header name should be `Authorization`, and the header value should be `Bearer <TOKEN>`.
-
-#### TLS Configuration
-
-To enable TLS, the following flags must be provided:
-
-* `http.enableTLS`: Starts a TLS/HTTPS server instead of HTTP.
-* `http.keyFile`: TLS private key file.
-* `http.certFile`: TLS certificate file.
-
-#### `log`
+#### Log Level
 
 Specify the log level. The following log levels are supported, and in order of verbosity from lowest to highest:
 
@@ -117,6 +168,70 @@ Specify the log level. The following log levels are supported, and in order of v
 - `info` (default)
 - `debug`
 - `trace`
+
+Increase the level to `debug` for more verbose logging.
+
+- Default: `info`
+- Command-line: `--log`
+
+#### Listen Address
+
+Address to listen on, in `IP:port` format.
+
+- Default: `:8080`
+- Config file: `httpServer.listenAddr`
+- Environment variable: `$LISTEN_ADDR`
+- Command-line: `--http.listenAddr`
+
+#### HTTP Authorization Token
+
+Optional authorization token that will be used to authenticate incoming requests. The header name should be `Authorization`, and the header value should be `Bearer <TOKEN>`.
+
+- Config file: `httpServer.auth.authorizationToken`
+- Environment variable: `$AUTH_TOKEN`
+- Command-line: `--http.authToken`
+
+#### HTTP TLS Configuration
+
+_Enable TLS_
+
+The following configuration fields are available to enable TLS:
+
+- Config file: `httpServer.tls.enabled`
+- Environment variable: `$TLS_ENABLED`
+- Command-line: `--http.enableTLS`
+
+_Certificate File / Key File_
+
+If TLS is enabled, the TLS certificate needs to be provided that will be served.
+
+- Certificate File
+  - Config file: `httpServer.tls.certFile`
+  - Environment variable: `$TLS_CERT_FILE`
+  - Command-line: `--http.certFile`
+- Key File
+  - Config file: `httpServer.tls.keyFile`
+  - Environment variable: `$TLS_KEY_FILE`
+  - Command-line: `--http.keyFile`
+
+_Certificate Data / Key Data_
+
+Alternatively, encode the actual TLS certificate in the configuration file, such as follows:
+
+```yaml
+httpServer:
+  tls:
+    enabled: true
+    certData: |
+      -----BEGIN CERTIFICATE-----
+      data omitted...
+      -----END CERTIFICATE-----
+```
+
+- Certificate Data
+  - Config file: `httpServer.tls.certData`
+- Key File
+  - Config file: `httpServer.tls.keyData`
 
 ## Supported Backends
 
@@ -132,14 +247,18 @@ Writes the ingested payloads into the local filesystem as JSON. Mainly intended 
 
 #### Configuration
 
-This backend is disabled by default.  You can enable it by specifying `--backend.localfile`.
+This backend is disabled by default.  You can enable it by specifying:
+
+- Config file: `backends.localfile.enabled`
+- Command-line: `--backend.localfile`
 
 You must also configure additional fields for the backend to work. Example configuration:
 
-```sh
-$ ingester \
-  --backend.localfile \
-  --localfile.metricsPath=/data/health-export-metrics
+```yaml
+backends:
+  localfile:
+    enabled: true
+    metricsPath: /data/health-export-metrics
 ```
 
 **NOTE**: Workout data is currently not yet supported for this storage backend.
@@ -172,23 +291,49 @@ Writes the ingested metrics and workout data into a configured InfluxDB backend.
 
 #### Configuration
 
-This backend is disabled by default. You can enable it by specifying `--backend.influxdb`.
+This backend is disabled by default. You can enable it by specifying:
+
+- Config file: `backends.influxdb.enabled`
+- Command-line: `--backend.influxdb`
 
 You must also configure additional fields for the backend to work. Example configuration:
 
-```sh
-$ ingester \
-  --backend.influxdb \
-  --influxdb.serverURL=http://localhost:8086 \
-  --influxdb.authToken=INFLUX_API_TOKEN \
-  --influxdb.orgName=my-org \
-  --influxdb.metricsBucketName=apple_health_metrics \
-  --influxdb.workoutsBucketName=apple_health_workouts
+```yaml
+backends:
+  influxdb:
+    # Must be set to true to enable this backend.
+    enabled: true
+    # The URL to the InfluxDB server.
+    # Environment variable: $INFLUXDB_SERVER_URL.
+    serverURL: "http://localhost:8086"
+    # If true, skips TLS verification of the certificate chain and host name for
+    # the InfluxDB server.
+    # Environment variable: $INFLUXDB_INSECURE_SKIP_VERIFY
+    insecureSkipVerify: false
+    # Auth token to connect to InfluxDB.
+    # Environment variable: $INFLUXDB_AUTH_TOKEN
+    authToken: YOUR_INFLUX_API_TOKEN
+    # InfluxDB organization name.
+    # Environment variable: $INFLUXDB_ORG_NAME
+    orgName: my-org
+    # Configuration for InfluxDB bucket names for various data points.
+    bucketNames:
+      # InfluxDB bucket name for metrics.
+      # Environment variable: $INFLUXDB_METRICS_BUCKET
+      metrics: apple_health_metrics
+      # InfluxDB bucket name for workouts.
+      # Environment variable: $INFLUXDB_WORKOUTS_BUCKET
+      workouts: apple_health_workouts
+    # Additional tags to add to InfluxDB for every single request.
+    # Uncomment the following lines to add static tags to all metrics.
+    #staticTags:
+    #  key1: value1
+    #  key2: value2
 ```
 
 #### Metrics Data Format
 
-All metrics will be stored in the bucket named by `--influxdb.metricsBucketName` using the following format:
+All metrics will be stored in the _Metrics Bucket_ using the following format:
 
 - Measurement: 
   - Metric name (e.g. `active_energy`) + Unit (e.g. `kJ`)
@@ -203,11 +348,11 @@ All metrics will be stored in the bucket named by `--influxdb.metricsBucketName`
     - The rest of the fields can be found here: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format
 - Tags:
   - `target_name`: Optional, set by `?target=TARGET_NAME` query string from HTTP request.
-  - Additional tags can be set by `--influxdb.staticTags`.
+  - Additional tags can be set by `--influxdb.staticTags` / `backends.influxdb.staticTags`.
 
 #### Workouts Data Format
 
-Workout data will be stored in the bucket named by `--influxdb.workoutsBucketName`. Workout data is slightly more complicated than metrics. You can read more about the workout data format here: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format#workouts 
+Workout data will be stored in the _Workouts Bucket_. Workout data is slightly more complicated than metrics. You can read more about the workout data format here: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format#workouts 
 
 There are two kinds of data:
 
@@ -232,7 +377,7 @@ All workout data have the following tags:
   - `target_name`: Optional, set by `?target=TARGET_NAME` query string from HTTP request.
   - `workout_name`: Name of the workout. 
     - Example `Walking`
-  - Additional tags can be set by `--influxdb.staticTags`.
+  - Additional tags can be set by `--influxdb.staticTags` / `backends.influxdb.staticTags`.
 
 #### Example Output
 

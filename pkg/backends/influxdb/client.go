@@ -7,6 +7,7 @@ import (
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
 
+	configv1 "github.com/irvinlim/apple-health-ingester/apis/config/v1"
 	apierrors "github.com/irvinlim/apple-health-ingester/pkg/errors"
 )
 
@@ -27,16 +28,20 @@ type clientImpl struct {
 var _ Client = (*clientImpl)(nil)
 
 // NewClient returns a real influxdb Client initialized from flags.
-func NewClient() (Client, error) {
-	client, err := NewInfluxDBClient()
+func NewClient(cfg *configv1.InfluxdbBackendConfig) (Client, error) {
+	if cfg == nil {
+		cfg = &configv1.InfluxdbBackendConfig{}
+	}
+
+	client, err := NewInfluxDBClient(cfg)
 	if err != nil {
 		return nil, err
 	}
 	impl := &clientImpl{
 		client:             client,
-		orgName:            orgName,
-		metricsBucketName:  metricsBucketName,
-		workoutsBucketName: workoutsBucketName,
+		orgName:            cfg.OrgName,
+		metricsBucketName:  cfg.BucketNames.Metrics,
+		workoutsBucketName: cfg.BucketNames.Workouts,
 	}
 	return impl, nil
 }
