@@ -31,6 +31,7 @@ var (
 
 	// TimeFormats contains all known time formats to parse timestamp by.
 	TimeFormats = []string{
+		time.RFC3339,
 		// Using 24-Hour Time
 		"2006-01-02 15:04:05 -0700",
 		// In case General > Date & Time > 24-Hour Time is set to false
@@ -47,8 +48,10 @@ type Payload struct {
 }
 
 type PayloadData struct {
-	Metrics  []*Metric  `json:"metrics,omitempty"`
-	Workouts []*Workout `json:"workouts,omitempty"`
+	Metrics     []*Metric      `json:"metrics,omitempty"`
+	Workouts    []*Workout     `json:"workouts,omitempty"`
+	StateOfMind []*StateOfMind `json:"stateOfMind,omitempty"`
+	Symptoms    []*Symptom     `json:"symptoms,omitempty"`
 }
 
 // Metric defines a single measurement with units, as well as time-series data points.
@@ -137,6 +140,30 @@ type AggregatedSleepAnalysis struct {
 
 func (m *Metric) GetUnits() Units {
 	return m.Units
+}
+
+// StateOfMind defines a single state of mind entry.
+type StateOfMind struct {
+	ID                    string            `json:"id"`
+	Start                 *Time             `json:"start"`
+	End                   *Time             `json:"end"`
+	Kind                  string            `json:"kind"`
+	Labels                []string          `json:"labels"`
+	Associations          []string          `json:"associations"`
+	Valence               float64           `json:"valence"`
+	ValenceClassification string            `json:"valenceClassification"`
+	Metadata              map[string]string `json:"metadata"`
+}
+
+// Symptom defines a single symptom entry.
+type Symptom struct {
+	Start       *Time  `json:"start"`
+	End         *Time  `json:"end"`
+	Name        string `json:"name"`
+	Severity    string `json:"severity"`
+	UserEntered bool   `json:"userEntered"`
+	Source      string `json:"source"`
+	CycleStart  bool   `json:"cycleStart"`
 }
 
 // Workout defines a single recorded Workout.
