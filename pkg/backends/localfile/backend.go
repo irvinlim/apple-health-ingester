@@ -107,6 +107,7 @@ func (b *Backend) handleMetric(metric *healthautoexport.Metric, target string) e
 	if err := b.writeMetricFile(metricFilePath, &metricFile); err != nil {
 		return errors.Wrapf(err, "cannot write metrics to %v", metricFilePath)
 	}
+	b.metrics[fileName] = &metricFile
 
 	return nil
 }
