@@ -145,7 +145,8 @@ type BackendTest struct {
 
 func NewBackendTest(t *testing.T) *BackendTest {
 	client := influxdb.NewMockClient()
-	backend, err := influxdb.NewBackend(client)
+	// Use a nil config for now, but support overriding the client in tests in the future.
+	backend, err := influxdb.NewBackend(nil, client)
 	if err != nil {
 		t.Fatalf("init backend failed: %v", err)
 	}

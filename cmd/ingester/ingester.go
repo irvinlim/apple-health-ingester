@@ -7,11 +7,12 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	configv1 "github.com/irvinlim/apple-health-ingester/apis/config/v1"
 	"github.com/irvinlim/apple-health-ingester/pkg/backends"
 	"github.com/irvinlim/apple-health-ingester/pkg/ingester"
 )
 
-type RegisterBackendFunc func(ingester *ingester.Ingester, mux *http.ServeMux) error
+type RegisterBackendFunc func(cfg *configv1.Config, ingester *ingester.Ingester, mux *http.ServeMux) error
 
 func RegisterBackend(backend backends.Backend, ingester *ingester.Ingester, mux *http.ServeMux, pattern string) error {
 	mux.Handle(pattern, handleIngest(ingester, backend.Name()))

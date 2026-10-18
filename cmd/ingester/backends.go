@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	configv1 "github.com/irvinlim/apple-health-ingester/apis/config/v1"
 	"github.com/irvinlim/apple-health-ingester/pkg/backends/influxdb"
 	"github.com/irvinlim/apple-health-ingester/pkg/backends/localfile"
 	"github.com/irvinlim/apple-health-ingester/pkg/ingester"
@@ -15,11 +16,15 @@ const (
 )
 
 // RegisterDebugBackend registers the Debug backend.
-func RegisterDebugBackend(ingester *ingester.Ingester, mux *http.ServeMux) error {
-	if !enableLocalFile {
+func RegisterDebugBackend(cfg *configv1.Config, ingester *ingester.Ingester, mux *http.ServeMux) error {
+	if cfg == nil {
+		cfg = &configv1.Config{}
+	}
+	backendCfg := cfg.Backends.LocalFile.DeepCopy()
+	if !backendCfg.Enabled {
 		return nil
 	}
-	backend, err := localfile.NewBackend()
+	backend, err := localfile.NewBackend(backendCfg)
 	if err != nil {
 		return err
 	}
@@ -27,15 +32,19 @@ func RegisterDebugBackend(ingester *ingester.Ingester, mux *http.ServeMux) error
 }
 
 // RegisterInfluxDBBackend registers the InfluxDB backend.
-func RegisterInfluxDBBackend(ingester *ingester.Ingester, mux *http.ServeMux) error {
-	if !enableInfluxDB {
+func RegisterInfluxDBBackend(cfg *configv1.Config, ingester *ingester.Ingester, mux *http.ServeMux) error {
+	if cfg == nil {
+		cfg = &configv1.Config{}
+	}
+	backendCfg := cfg.Backends.InfluxDB.DeepCopy()
+	if !backendCfg.Enabled {
 		return nil
 	}
-	client, err := influxdb.NewClient()
+	client, err := influxdb.NewClient(backendCfg)
 	if err != nil {
 		return errors.Wrapf(err, "cannot initialize client")
 	}
-	backend, err := influxdb.NewBackend(client)
+	backend, err := influxdb.NewBackend(backendCfg, client)
 	if err != nil {
 		return err
 	}
